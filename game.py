@@ -80,10 +80,10 @@ class Game:
         if player_num <= 5:
             print(self.prev_chancellor_id)
             print(player_id)
-            if self.prev_chancellor_id is player_id:
+            if self.chancellor is not None and self.chancellor.player_id is player_id:
                 return False
         elif player_num > 5:
-            if self.prev_chancellor_id is player_id or self.prev_president is player_id:
+            if (self.chancellor is not None and self.chancellor.player_id is player_id) or self.prev_president_id is player_id:
                 return False
 
         if self.president is not None and self.president.player_id is player_id:
@@ -411,9 +411,6 @@ class Game:
         random.shuffle(self.deck)
         self.votes = {}
         self.state = GameStates.GAME_STARTING
-
-
-
 
 
 class GameStates(Enum):

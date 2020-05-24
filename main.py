@@ -337,6 +337,10 @@ async def discard(ctx, card):
         await start_nomination(game)
         return
 
+    if game.fascist_board == 5:
+        embed = discord.Embed(title='Veto right', description="Five fascist policies are enacted. The chancellor can now veto an agenda. Use -veto to do that", color=discord.Color.dark_red())
+        await client.get_channel(game.channel_id).send(embed=embed)
+
     if game.state == GameStates.GAME_OVER:
         embed = discord.Embed(title='Game over!', description=game.winner+'s won the game. Use -restart to restart the game.', color=discord.Color.dark_red())
         for player in game.players:
@@ -405,6 +409,81 @@ async def investigate(ctx, player : commands.UserConverter):
     game.set_president()
 
     await start_nomination(game)
+
+
+
+@client.command(name='veto')
+async def veto(ctx):
+    game = get_game_with_player(ctx.message.author.id)
+    if not game:
+        await ctx.send("You are not in a game")
+        return
+
+    if game.fascist_board < 5:
+        await ctx.send("The veto right is not enabled yet")
+        return
+
+    if game.state is not GameStates.LEGISLATIVE_CHANCELLOR:
+        await ctx.send("You can't veto at the moment")
+        return
+
+    if game.chancellor is not None and game.chancellor.player_id is not ctx.message.author.id:
+        await ctx.send("You are not the chancellor")
+        return
+
+    game.state = GameStates.VETO
+
+    embed = discord.Embed(title="Veto", description="The current chancellor requested veto for this agenda. The president needs to accept (-accept) or decline (-decline) the veto", color=discord.Color.dark_red())
+    await client.get_channel(game.channel_id).send(embed=embed)
+
+
+@client.command(name='accept')
+async def accept(ctx):
+    game = get_game_with_player(ctx.message.author.id)
+    if not game:
+        await ctx.send("You are not in a game")
+        return
+
+    if game.state is not GameStates.VETO:
+        await ctx.send("You can't accept a veto at the moment")
+        return
+
+    if game.president.player_id is not ctx.message.author.id:
+        await ctx.send("You are not the president")
+        return
+
+    embed = discord.Embed(title="Veto accepted", description="All three policies will be discarded", color=discord.Color.dark_red())
+    await client.get_channel(game.channel_id).send(embed=embed)
+
+    for i in range(len(game.policies)):
+        game.discard.append(game.policies[i])
+    game.policies.clear()
+
+    game.set_president()
+
+    await start_nomination(game)
+
+
+@client.command(name='decline')
+async def accept(ctx):
+    game = get_game_with_player(ctx.message.author.id)
+    if not game:
+        await ctx.send("You are not in a game")
+        return
+
+    if game.state is not GameStates.VETO:
+        await ctx.send("You can't accept a veto at the moment")
+        return
+
+    if game.president.player_id is not ctx.message.author.id:
+        await ctx.send("You are not the president")
+        return
+
+    embed = discord.Embed(title="Veto declined", description="The chancellor has to discard a policy",
+                          color=discord.Color.dark_red())
+    await client.get_channel(game.channel_id).send(embed=embed)
+
+    game.state = GameStates.LEGISLATIVE_CHANCELLOR
 
 
 @client.command(name='execute')
@@ -682,6 +761,9 @@ async def printHelp(channel):
     embed.add_field(name="-startgame <public/private> <players>", value="Starts a public or private game.", inline=False)
     embed.add_field(name="-stopgame <id>", value="Stops the game with the given id", inline=False)
     embed.add_field(name="-invite <username>", value="Invites a player to a private game", inline=False)
+    embed.add_field(name="-veto", value="Veto the current agenda", inline=False)
+    embed.add_field(name="-accept", value="Accept the current veto", inline=False)
+    embed.add_field(name="-decline", value="Decline the current veto", inline=False)
     embed.add_field(name="-restart", value="Restarts a game", inline=False)
     embed.add_field(name="-investigate <playername>", value="Investigates a players party", inline=False)
     embed.add_field(name="-discard <l/f>", value="Discards a fascist or a liberal policy", inline=False)
