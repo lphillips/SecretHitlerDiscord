@@ -40,6 +40,7 @@ class Game:
         self.discard = []
         self.nominated = None
         self.policies = []
+        self.investigated_one = False
         self.investigated = False
         self.peeked = False
         self.executed_one = False
@@ -143,10 +144,15 @@ class Game:
                     self.state = GameStates.NOMINATION
                     return False
                 else:
-                    if self.fascist_board == 2 and not self.investigated:
+                    if self.fascist_board == 1 and not self.investigated_one and self.max_players > 8:
+                        self.state = GameStates.INVESTIGATION
+                        return False
+                    if self.fascist_board == 2 and not self.investigated and self.max_players > 6:
+                        print(self.max_players)
                         self.state = GameStates.INVESTIGATION
                         return False
                     elif self.fascist_board == 3 and not self.peeked:
+                        # TODO Add special election
                         self.state = GameStates.POLICY_PEEK
                         return False
                     elif self.fascist_board == 4 and not self.executed_one:
@@ -186,12 +192,16 @@ class Game:
 
     def return_path_to_fascist_board(self):
         if self.fascist_board == 0:
-            return 'img/fascist_board.png'
+            if self.max_players < 7:
+                return 'img/FascistBoard1.png'
+            elif self.max_players < 9:
+                return 'img/FascistBoard2.png'
+            return 'img/FascistBoard3.png'
         return "game_files/fascist_" + str(self.game_id) + ".png"
 
     def return_path_to_liberal_board(self):
         if self.liberal_board == 0:
-            return 'img/liberal_board.png'
+            return 'img/LiberalBoard.png'
         return "game_files/liberal_" + str(self.game_id) + ".png"
 
     def set_president(self):
@@ -291,20 +301,24 @@ class Game:
         self.peeked = True
 
     def printBoard(self):
-        img1 = Image.open('img/policy_liberal.png')
-        img1 = img1.resize((213, 285))
+        img1 = Image.open('img/liberal_policy.png')
 
-        img_new = Image.open('img/liberal_board.png')
+        img_new = Image.open('img/LiberalBoard.png')
         for i in range(self.liberal_board):
-            img_new.paste(img1, (31 + i * 216, 124))
+            img_new.paste(img1, config.configuration["liberal_board"][i])
         img_new.save("game_files/liberal_" + str(self.game_id) + ".png")
 
-        img2 = Image.open('img/policy_fascist.png')
-        img2 = img2.resize((170, 255))
+        img2 = Image.open('img/fascist_policy.png')
 
-        img_new_2 = Image.open('img/fascist_board.png')
+        if self.max_players < 7:
+            img_new_2 = Image.open('img/FascistBoard1.png')
+        elif self.max_players < 9:
+            img_new_2 = Image.open('img/FascistBoard2.png')
+        else:
+            img_new_2 = Image.open('img/FascistBoard3.png')
+
         for i in range(self.fascist_board):
-            img_new_2.paste(img2, (50 + i * 175, 145))
+            img_new_2.paste(img2, config.configuration["fascist_board"][i])
         img_new_2.save("game_files/fascist_" + str(self.game_id) + ".png")
 
     def chancellor_legislative(self):

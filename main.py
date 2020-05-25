@@ -397,7 +397,11 @@ async def investigate(ctx, player : commands.UserConverter):
         return
 
     party = game.get_player(player.id).get_party()
-    game.investigated = True
+
+    if game.fascist_board == 1:
+        game.investigated_one = True
+    else:
+        game.investigated = True
 
     embed = discord.Embed(title='Investigation', description='Player '+client.get_user(player.id).name +' is a '+party, color=discord.Color.dark_red())
     embed.set_thumbnail(url=client.get_user(player.id).avatar_url)
@@ -718,7 +722,10 @@ async def sendRoles(game : Game):
         file = discord.File("img/fascist_role.png", filename="role.png")
         embed = discord.Embed(title="Fascist", description="Fascist is your secret role.",
                               color=discord.Color.orange())
-        embed.add_field(name="Hitler", value=client.get_user(hitler.player_id).name+" is hitler")
+        embed.add_field(name="Hitler", value=client.get_user(hitler.player_id).name+" is hitler", inline=False)
+        if len(game.players) > 6:
+            for fas in fascists:
+                embed.add_field(name="Fascist", value=client.get_user(fas.player_id).name, inline=False)
         embed.set_image(url="attachment://role.png")
         await client.get_user(player.player_id).send(file=file, embed=embed)
 
