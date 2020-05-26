@@ -117,7 +117,6 @@ class Game:
 
         if yes > no:
             if self.chancellor is None and self.prev_chancellor_id == -1:
-                print("Test")
                 self.prev_chancellor_id = -1
             else:
                 self.prev_chancellor = self.chancellor
@@ -130,8 +129,7 @@ class Game:
             self.failed_votes = 0
             self.state = GameStates.LEGISLATIVE_PRESIDENT
             return True
-
-        if yes < no or yes == no:
+        else:
             self.nominated = None
             self.failed_votes = self.failed_votes + 1
             if self.failed_votes > 3:
@@ -149,6 +147,7 @@ class Game:
                         return False
                     if self.fascist_board == 2 and not self.investigated and self.max_players > 6:
                         print(self.max_players)
+                        print("HH")
                         self.state = GameStates.INVESTIGATION
                         return False
                     elif self.fascist_board == 3 and not self.peeked:
@@ -364,16 +363,22 @@ class Game:
                                 self.state = GameStates.NOMINATION
                                 return True
                             else:
-                                if self.fascist_board == 2 and not self.investigated:
+                                if self.fascist_board == 1 and not self.investigated_one and self.max_players > 8:
                                     self.state = GameStates.INVESTIGATION
                                     return True
-                                if self.fascist_board == 3 and not self.peeked:
+                                elif self.fascist_board == 2 and not self.investigated and self.max_players > 6:
+                                    print(self.max_players)
+                                    print("HH")
+                                    self.state = GameStates.INVESTIGATION
+                                    return True
+                                elif self.fascist_board == 3 and not self.peeked:
+                                    # TODO Add special election
                                     self.state = GameStates.POLICY_PEEK
                                     return True
-                                if self.fascist_board == 4 and not self.executed_one:
+                                elif self.fascist_board == 4 and not self.executed_one:
                                     self.state = GameStates.EXECUTION
                                     return True
-                                if self.fascist_board == 5 and not self.executed_two:
+                                elif self.fascist_board == 5 and not self.executed_two:
                                     self.state = GameStates.EXECUTION
                                     return True
 
