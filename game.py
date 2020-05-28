@@ -122,7 +122,7 @@ class Game:
                 self.prev_chancellor = self.chancellor
                 self.prev_chancellor_id = self.chancellor.player_id
             self.chancellor = self.nominated
-            if self.chancellor.role == "Hitler" and self.fascist_board > 3:
+            if self.chancellor.role == "Hitler" and self.fascist_board >= 3:
                 self.state = GameStates.GAME_OVER
                 self.winner = "Fascist"
                 return False
@@ -151,8 +151,10 @@ class Game:
                         self.state = GameStates.INVESTIGATION
                         return False
                     elif self.fascist_board == 3 and not self.peeked:
-                        # TODO Add special election
-                        self.state = GameStates.POLICY_PEEK
+                        if self.max_players > 6:
+                            self.state = GameStates.SPECIAL_ELECTION
+                        else:
+                            self.state = GameStates.POLICY_PEEK
                         return False
                     elif self.fascist_board == 4 and not self.executed_one:
                         self.state = GameStates.EXECUTION
@@ -372,8 +374,10 @@ class Game:
                                     self.state = GameStates.INVESTIGATION
                                     return True
                                 elif self.fascist_board == 3 and not self.peeked:
-                                    # TODO Add special election
-                                    self.state = GameStates.POLICY_PEEK
+                                    if self.max_players > 6:
+                                        self.state = GameStates.SPECIAL_ELECTION
+                                    else:
+                                        self.state = GameStates.POLICY_PEEK
                                     return True
                                 elif self.fascist_board == 4 and not self.executed_one:
                                     self.state = GameStates.EXECUTION

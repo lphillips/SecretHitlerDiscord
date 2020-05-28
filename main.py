@@ -67,6 +67,8 @@ async def on_reaction_add(reaction, user):
                 await sendBoard(game)
                 game.failed_votes = 0
                 if game.state == GameStates.NOMINATION:
+                    game.set_presidnet()
+                    game.nominated = None
                     await start_nomination(game)
                     return
 
@@ -256,6 +258,10 @@ async def stop_game(ctx, id : int):
         await ctx.send("You don't have the permission to stop this game")
         return
 
+    game = running_games[id]
+    if not game:
+        await ctx.send("This game does not exist")
+        return
     guild = ctx.guild
     role = discord.utils.get(guild.roles, name='game_'+str(id)+'_administrator')
     if role:
@@ -264,7 +270,7 @@ async def stop_game(ctx, id : int):
     member_role = discord.utils.get(guild.roles, name='game_' + str(id) + '_member')
     if role:
         await member_role.delete()
-    channel = discord.utils.get(guild.channels, name='game_'+str(id))
+    channel = client.get_channel(game.channel_id)
     if channel:
         await channel.delete()
     voice = discord.utils.get(guild.voice_channels, name='game_'+str(id))
@@ -324,6 +330,8 @@ async def discard(ctx, card):
         await ctx.send("Policy can't be discarded. You either don't have the permission to do it or you cant discard this policy. Use -discard <f/l>")
         return
 
+    await ctx.send("You successfully discarded a policy")
+
     if game.state == GameStates.LEGISLATIVE_CHANCELLOR:
         embed = discord.Embed(title='The President discarded a policy', description='Waiting for the chancellor to discard a policy', color=discord.Color.dark_red())
         await client.get_channel(game.channel_id).send(embed=embed)
@@ -375,7 +383,41 @@ async def discard(ctx, card):
         await client.get_channel(game.channel_id).send(embed=embed)
         return
 
+    if game.state == GameStates.SPECIAL_ELECTION:
+        embed = discord.Embed(title="Special Election",
+                              description="The current president picks the next President. Please use -president <playername>",
+                              color=discord.Color.dark_red())
+        await client.get_channel(game.channel_id).send(embed=embed)
+        return
 
+
+@client.command(name='president')
+async def president(ctx, player : commands.UserConverter):
+    game = get_game_with_player(ctx.message.author.id)
+    if not game:
+        await ctx.send("You are not in a game")
+        return
+
+    if game.state is not GameStates.SPECIAL_ELECTION:
+        await ctx.send("You can't pick a president now")
+        return
+
+    if game.president.player_id is not ctx.message.author.id:
+        await ctx.send("You are not the president")
+        return
+
+    if not game.has_player(player.id):
+        await ctx.send("This player is not in the same game as you")
+        return
+
+    player = game.get_player(player.id)
+
+    game.peeked = True
+
+    game.prev_president_id = game.president.player_id
+    game.president = player
+
+    await start_nomination(game)
 
 @client.command(name='investigate')
 async def investigate(ctx, player : commands.UserConverter):
@@ -530,7 +572,7 @@ async def execute(ctx, player : commands.UserConverter):
                               description=game.winner + 's won the game. Use -restart to restart the game.',
                               color=discord.Color.dark_red())
         for player in game.players:
-            embed.add_field(name=client.get_user(executed.player_id).name, value=player.role, inline=False)
+            embed.add_field(name=client.get_user(player.player_id).name, value=player.role, inline=False)
         for player in game.dead:
             embed.add_field(name=client.get_user(executed.player_id).name, value=player.role, inline=False)
         await client.get_channel(game.channel_id).send(embed=embed)
@@ -541,7 +583,7 @@ async def execute(ctx, player : commands.UserConverter):
                               description=game.winner + 's won the game. Use -restart to restart the game.',
                               color=discord.Color.dark_red())
         for player in game.players:
-            embed.add_field(name=client.get_user(executed.player_id).name, value=player.role, inline=False)
+            embed.add_field(name=client.get_user(player.player_id).name, value=player.role, inline=False)
         for player in game.dead:
             embed.add_field(name=client.get_user(executed.player_id).name, value=player.role, inline=False)
         await client.get_channel(game.channel_id).send(embed=embed)
@@ -560,7 +602,7 @@ async def execute(ctx, player : commands.UserConverter):
                               color=discord.Color.dark_red())
         await client.get_channel(game.channel_id).send(embed=embed)
     else:
-        embed = discord.Embed(title='Player executed', description=client.get_user(executed.player_id).name+ " was executed. His secret role was "+executed.role)
+        embed = discord.Embed(title='Player executed', description=client.get_user(executed.player_id).name+ " was executed.")
         embed.set_thumbnail(url=client.get_user(executed.player_id).avatar_url)
         await client.get_channel(game.channel_id).send(embed=embed)
         game.state = GameStates.NOMINATION
