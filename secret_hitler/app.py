@@ -823,4 +823,4 @@ async def printHelp(channel):
     await channel.send(embed=embed)
 
 
-client.run('Nzk1NzUzODM5NjA0NTMxMjEw.X_N9gw.k-TN-lvkdyYLT_jVzSeTCK3De7A')
+client.run('TOKEN')
