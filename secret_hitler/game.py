@@ -1,8 +1,6 @@
 import random
 from enum import Enum
-
 from PIL import Image
-
 from secret_hitler import config
 
 
