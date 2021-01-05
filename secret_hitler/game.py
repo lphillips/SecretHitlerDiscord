@@ -1,7 +1,10 @@
-from enum import Enum
 import random
-import config
+from enum import Enum
+
 from PIL import Image
+
+from secret_hitler import config
+
 
 class Player:
     def __init__(self, player_id):
