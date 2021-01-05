@@ -1,6 +1,5 @@
 import unittest
-
-from main import game
+from secret_hitler import game
 
 
 class GameInitTestCase(unittest.TestCase):
