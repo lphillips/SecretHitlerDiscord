@@ -104,5 +104,23 @@ configuration = {
         (576,90),
         (736,90),
         (894,90)
+    ],
+    # emoji to add to the server
+    # key is the name of the emoji
+    # value is the file to upload
+    "emoji": {
+        "ja": "img/ja.png",
+        "nein": "img/nein.png",
+        "liberal_policy": "img/policy_liberal.png",
+        "fascist_policy": "img/policy_fascist.png",
+    },
+    # category name
+    "category": "Secret Hitler",
+    # channel names
+    "channels": [
+        "rules",
+        "help",
+        "license",
+        "lobby"
     ]
 }
