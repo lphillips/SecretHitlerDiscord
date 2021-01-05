@@ -1,8 +1,8 @@
 import discord
 import logging
 from discord.ext import commands
-from game import Game, GameStates, Player
-import config
+from secret_hitler.game import Game, GameStates, Player
+from secret_hitler import config
 
 logFormatter = logging.Formatter('[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
 
