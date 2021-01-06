@@ -109,10 +109,10 @@ configuration = {
     # key is the name of the emoji
     # value is the file to upload
     "emoji": {
-        "sh_ja": "secret_hitler/img/ja.png",
-        "sh_nein": "secret_hitler/img/nein.png",
-        "sh_liberal_policy": "secret_hitler/img/policy_liberal.png",
-        "sh_fascist_policy": "secret_hitler/img/policy_fascist.png",
+        "secret_hitler_ja": "secret_hitler/img/ja.png",
+        "secret_hitler_nein": "secret_hitler/img/nein.png",
+        "secret_hitler_liberal_policy": "secret_hitler/img/policy_liberal.png",
+        "secret_hitler_fascist_policy": "secret_hitler/img/policy_fascist.png",
     },
     # category name
     "category": "Secret Hitler",
