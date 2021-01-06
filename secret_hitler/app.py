@@ -16,13 +16,16 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logFormatter)
 discordLogger.addHandler(handler)
 
-
 # logger for this application
 logger = logging.getLogger("secret_hitler")
 logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
 handler.setFormatter(logFormatter)
 logger.addHandler(handler)
+
+#constants for ja or nein voting
+JA='sh_ja'
+NEIN='sh_nein'
 
 client = commands.Bot(command_prefix="-")
 client.remove_command(name='help')
@@ -55,9 +58,9 @@ async def on_reaction_add(reaction, user):
     if game.state == GameStates.ELECTION:
         emoji = reaction.emoji
         vote = False
-        if "ja" in emoji.name:
+        if JA in emoji.name:
             vote = game.vote(user.id, 'y')
-        elif "nein" in emoji.name:
+        elif NEIN in emoji.name:
             vote = game.vote(user.id, 'n')
 
         if not vote:
@@ -241,7 +244,7 @@ async def start_game(ctx, mode, players : int):
     message = await channel.send(embed=embed)
 
     if mode.lower() == 'public':
-        await message.add_reaction(discord.utils.get(ctx.guild.emojis, name='ja'))
+        await message.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
 
 
 @client.command(name='invite')
@@ -334,8 +337,8 @@ async def nominate(ctx, player : commands.MemberConverter):
     embed = discord.Embed(title='Player '+player.name+' was nominated for chancellor', description="Please react to this message with Ja or Nein to vote", color=discord.Color.dark_red())
     embed.set_thumbnail(url=player.avatar_url)
     msg = await client.get_channel(game.channel_id).send(embed=embed)
-    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name='ja'))
-    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name='nein'))
+    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
+    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
 
 @client.command(name='discard')
 async def discard(ctx, card):
@@ -692,10 +695,11 @@ async def cleanup(guild):
         await category.delete()
         logger.info("Deletedcategory: " + category.name)
     
-    for e in guild.emojis:
-        logger.debug("Deleting emoji: " + e.name)
-        await e.delete()
-        logger.info("Deleted emoji: " + e.name)
+    for e in await guild.fetch_emojis():
+        if e.user.id == client.user.id:
+            logger.debug("Deleting emoji: " + e.name)
+            await e.delete()
+            logger.info("Deleted emoji: " + e.name)
 
     
 
