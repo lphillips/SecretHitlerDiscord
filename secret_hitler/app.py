@@ -24,8 +24,11 @@ handler.setFormatter(logFormatter)
 logger.addHandler(handler)
 
 #constants for ja or nein voting
-JA='sh_ja'
-NEIN='sh_nein'
+for e in config.configuration["emoji"]:
+    if "ja" in e:
+        JA=e
+    elif "nein" in e:
+        NEIN=e
 
 client = commands.Bot(command_prefix="-")
 client.remove_command(name='help')
