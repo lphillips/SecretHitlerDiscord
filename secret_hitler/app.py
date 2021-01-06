@@ -1,6 +1,7 @@
+import os
 import discord
 from discord.ext import commands
-
+from dotenv import load_dotenv
 from secret_hitler.game import Game, GameStates
 
 client = commands.Bot(command_prefix="-")
@@ -823,4 +824,10 @@ async def printHelp(channel):
     await channel.send(embed=embed)
 
 
-client.run('TOKEN')
+load_dotenv()
+token = os.getenv("SECRET_HITLER_DISCORD_TOKEN")
+
+if token is None:
+    raise RuntimeError("SECRET_HITLER_DISCORD_TOKEN environment variable not set")
+
+client.run(token)
