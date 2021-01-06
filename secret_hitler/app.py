@@ -1,8 +1,31 @@
 import os
 import discord
-from discord.ext import commands
+import logging
 from dotenv import load_dotenv
 from secret_hitler.game import Game, GameStates
+from discord.ext import commands
+from secret_hitler.game import Game, GameStates, Player
+from secret_hitler import config
+
+logFormatter = logging.Formatter('[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
+
+# log discord API messages to discord.log file
+discordLogger = logging.getLogger('discord')
+discordLogger.setLevel(logging.DEBUG)
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler.setFormatter(logFormatter)
+discordLogger.addHandler(handler)
+
+# logger for this application
+logger = logging.getLogger("secret_hitler")
+logger.setLevel(logging.DEBUG)
+handler = logging.StreamHandler()
+handler.setFormatter(logFormatter)
+logger.addHandler(handler)
+
+#constants for ja or nein voting
+JA='sh_ja'
+NEIN='sh_nein'
 
 client = commands.Bot(command_prefix="-")
 client.remove_command(name='help')
@@ -12,7 +35,7 @@ running_games = {}
 # Events
 @client.event
 async def on_ready():
-    print('We have logged in as {0.user}'.format(client))
+    logger.info('We have logged in as {0.user}'.format(client))
     act = discord.Game(name="Secret Hitler")
     await client.change_presence(status=discord.Status.online, activity=act)
 
@@ -35,9 +58,9 @@ async def on_reaction_add(reaction, user):
     if game.state == GameStates.ELECTION:
         emoji = reaction.emoji
         vote = False
-        if "ja" in emoji.name:
+        if JA in emoji.name:
             vote = game.vote(user.id, 'y')
-        elif "nein" in emoji.name:
+        elif NEIN in emoji.name:
             vote = game.vote(user.id, 'n')
 
         if not vote:
@@ -128,6 +151,10 @@ async def on_reaction_add(reaction, user):
 async def setup(ctx):
     await setup(ctx.guild)
 
+@client.command(name='cleanup')
+@commands.has_permissions(administrator=True)
+async def cleanup(ctx):
+    await cleanup(ctx.guild)
 
 @client.command(name='rules')
 async def rules(ctx):
@@ -174,7 +201,7 @@ async def start_game(ctx, mode, players : int):
         await ctx.send("You can't create a game, because you already joined one!")
         return
 
-    if players > 10:
+    if players > 10 or players < 5:
         await ctx.send("You have to choose between 5-10 players!")
         return
 
@@ -217,7 +244,7 @@ async def start_game(ctx, mode, players : int):
     message = await channel.send(embed=embed)
 
     if mode.lower() == 'public':
-        await message.add_reaction(discord.utils.get(ctx.guild.emojis, name='ja'))
+        await message.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
 
 
 @client.command(name='invite')
@@ -310,8 +337,8 @@ async def nominate(ctx, player : commands.MemberConverter):
     embed = discord.Embed(title='Player '+player.name+' was nominated for chancellor', description="Please react to this message with Ja or Nein to vote", color=discord.Color.dark_red())
     embed.set_thumbnail(url=player.avatar_url)
     msg = await client.get_channel(game.channel_id).send(embed=embed)
-    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name='ja'))
-    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name='nein'))
+    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
+    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
 
 @client.command(name='discard')
 async def discard(ctx, card):
@@ -513,7 +540,7 @@ async def accept(ctx):
 
 
 @client.command(name='decline')
-async def accept(ctx):
+async def decline(ctx):
     game = get_game_with_player(ctx.message.author.id)
     if not game:
         await ctx.send("You are not in a game")
@@ -656,46 +683,73 @@ async def start_president_legislative(game : Game):
     embed.set_image(url="attachment://president.png")
     msg = await client.get_user(game.president.player_id).send(embed=embed, file=file)
 
+async def cleanup(guild):
+    # Removes everything created by the setup function
+    category = get_category(guild)
+    if category is not None:
+        for c in category.channels:
+            logger.debug("Deleting channel: " + c.name)
+            await c.delete()
+            logger.info("Deleted channel: " + c.name)
+        logger.debug("Deleting category: " + category.name)
+        await category.delete()
+        logger.info("Deleted category: " + category.name)
+    
+    for e in await guild.fetch_emojis():
+        if e.user.id == client.user.id:
+            logger.debug("Deleting emoji: " + e.name)
+            await e.delete()
+            logger.info("Deleted emoji: " + e.name)
+
+    
+
 async def setup(guild):
     # Makes the guild ready to handle Games
-    category = await guild.create_category(name='Secret Hitler')
-    overwrites = {
-        guild.default_role: discord.PermissionOverwrite(send_messages=False),
-        guild.me: discord.PermissionOverwrite(send_messages=True)
-    }
-    rules = await guild.create_text_channel(name='rules', category=category, overwrites=overwrites)
-    help = await guild.create_text_channel(name='help', category=category, overwrites=overwrites)
-    license = await guild.create_text_channel(name='license', category=category, overwrites=overwrites)
-    await guild.create_text_channel(name='lobby', category=category)
-    await printRules(rules)
-    await printLicense(license)
-    await printHelp(help)
 
-    # Add custom emojis
-    with open('img/policy_fascist.png', 'rb') as image:
-        f = image.read()
-        b = bytearray(f)
+    #create a new category for the guild channels if it doesn't exist
+    category = get_category(guild)
+    if category is None:
+        logger.debug("Creating category: " + config.configuration['category'])
+        category = await guild.create_category(name=config.configuration['category'])
+        logger.info("Created category: " + category.name)
+    else:
+        logger.info("Found existing category: " + category.name)
 
-    await guild.create_custom_emoji(name='fascist_policy', image=b)
+    # create channels if they don't exist
+    channels = list(config.configuration["channels"])
+    for c in category.channels:
+        if c.name in channels:
+            logger.info("Found existing channel: " + c.name)
+            channels.remove(c.name)
+    
+    for c in channels:
+        # if there is a "print<channel name>" function, call it when creating the channel
+        # those channels also should be set to prevent users sending messages
+        logger.debug("Creating channel: " + c)
+        printFunc = "print" + c.capitalize()
+        if printFunc in globals():
+            await globals()[printFunc](await guild.create_text_channel(name=c, category=category, overwrites={
+                    guild.default_role: discord.PermissionOverwrite(send_messages=False),
+                    guild.me: discord.PermissionOverwrite(send_messages=True)
+                }))
+        else:
+            await guild.create_text_channel(name=c, category=category)
+        logger.info("Created channel: " + c)
 
-    with open('img/policy_liberal.png', 'rb') as image:
-        f = image.read()
-        b = bytearray(f)
-
-    await guild.create_custom_emoji(name='liberal_policy', image=b)
-
-    # Add custom emojis
-    with open('img/ja.png', 'rb') as image:
-        f = image.read()
-        b = bytearray(f)
-
-    await guild.create_custom_emoji(name='ja', image=b)
-
-    with open('img/nein.png', 'rb') as image:
-        f = image.read()
-        b = bytearray(f)
-
-    await guild.create_custom_emoji(name='nein', image=b)
+    # Add custom emojis if they aren't already added
+    emojis = dict(config.configuration["emoji"])
+    for e in guild.emojis:
+        if e.name in emojis:
+            logger.info("Found existing emoji: " + e.name)
+            del emojis[e.name]
+    
+    for ename, efile in emojis.items():
+        logger.debug("Adding custom emoji: " + ename)
+        with open(efile,'rb') as image:
+            f = image.read()
+            b = bytearray(f)
+        await guild.create_custom_emoji(name=ename, image=b)
+        logger.info("Added custom emoji: " + ename)
 
 
 async def start_nomination(game : Game):
@@ -710,7 +764,7 @@ async def start_nomination(game : Game):
 def get_category(guild):
     categories = guild.categories
     for category in categories:
-        if 'Secret Hitler' in category.name:
+        if category.name == config.configuration['category']:
             return category
     return None
 
