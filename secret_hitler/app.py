@@ -1,5 +1,8 @@
+import os
 import discord
 import logging
+from dotenv import load_dotenv
+from secret_hitler.game import Game, GameStates
 from discord.ext import commands
 from secret_hitler.game import Game, GameStates, Player
 from secret_hitler import config
@@ -145,6 +148,10 @@ async def on_reaction_add(reaction, user):
 async def setup(ctx):
     await setup(ctx.guild)
 
+@client.command(name='cleanup')
+@commands.has_permissions(administrator=True)
+async def cleanup(ctx):
+    await cleanup(ctx.guild)
 
 @client.command(name='rules')
 async def rules(ctx):
@@ -673,6 +680,25 @@ async def start_president_legislative(game : Game):
     embed.set_image(url="attachment://president.png")
     msg = await client.get_user(game.president.player_id).send(embed=embed, file=file)
 
+async def cleanup(guild):
+    # Removes everything created by the setup function
+    category = get_category(guild)
+    if category is not None:
+        for c in category.channels:
+            logger.debug("Deleting channel: " + c.name)
+            await c.delete()
+            logger.info("Deleted channel: " + c.name)
+        logger.debug("Deleting category: " + category.name)
+        await category.delete()
+        logger.info("Deletedcategory: " + category.name)
+    
+    for e in guild.emojis:
+        logger.debug("Deleting emoji: " + e.name)
+        await e.delete()
+        logger.info("Deleted emoji: " + e.name)
+
+    
+
 async def setup(guild):
     # Makes the guild ready to handle Games
 
@@ -848,4 +874,10 @@ async def printHelp(channel):
     await channel.send(embed=embed)
 
 
-client.run('TOKEN')
+load_dotenv()
+token = os.getenv("SECRET_HITLER_DISCORD_TOKEN")
+
+if token is None:
+    raise RuntimeError("SECRET_HITLER_DISCORD_TOKEN environment variable not set")
+
+client.run(token)
