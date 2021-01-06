@@ -115,7 +115,7 @@ async def on_reaction_add(reaction, user):
 
                 if game.state == GameStates.POLICY_PEEK:
                     game.policy_peek()
-                    file = discord.File('game_files/policypeek_' + str(game.game_id) + '.png', filename='president.png')
+                    file = discord.File('secret_hitler/img/policypeek_' + str(game.game_id) + '.png', filename='president.png')
                     embed = discord.Embed(title="Policy Peek",
                                           description="These are the next three policies.",
                                           color=discord.Color.dark_red())
@@ -173,17 +173,17 @@ async def help(ctx):
 
 @client.command(name='roletest')
 async def roletest(ctx):
-    file = discord.File("img/hitler_role.png", filename="role.png")
+    file = discord.File("secret_hitler/img/hitler_role.png", filename="role.png")
     embed = discord.Embed(title="Hitler", description="Hitler is your secret role.", color=discord.Color.dark_red())
     embed.set_image(url="attachment://role.png")
     await ctx.send(file=file, embed=embed)
 
-    file = discord.File("img/fascist_role.png", filename="role.png")
+    file = discord.File("secret_hitler/img/fascist_role.png", filename="role.png")
     embed = discord.Embed(title="Fascist", description="Fascist is your secret role.", color=discord.Color.orange())
     embed.set_image(url="attachment://role.png")
     await ctx.send(file=file, embed=embed)
 
-    file = discord.File("img/liberal_role.png", filename="role.png")
+    file = discord.File("secret_hitler/img/liberal_role.png", filename="role.png")
     embed = discord.Embed(title="Liberal", description="Liberal is your secret role.", color=discord.Color.blue())
     embed.set_image(url="attachment://role.png")
     await ctx.send(file=file, embed=embed)
@@ -392,7 +392,7 @@ async def discard(ctx, card):
 
     if game.state == GameStates.POLICY_PEEK:
         game.policy_peek()
-        file = discord.File('game_files/policypeek_' + str(game.game_id) + '.png', filename='president.png')
+        file = discord.File('secret_hitler/img/policypeek_' + str(game.game_id) + '.png', filename='president.png')
         embed = discord.Embed(title="Policy Peek",
                               description="These are the next three policies.",
                               color=discord.Color.dark_red())
@@ -668,7 +668,7 @@ async def restart(ctx):
 
 async def start_chancellor_legislative(game : Game):
     game.chancellor_legislative()
-    file = discord.File('game_files/chancellor_'+str(game.game_id)+'.png', filename='chancellor.png')
+    file = discord.File('secret_hitler/img/chancellor_'+str(game.game_id)+'.png', filename='chancellor.png')
     embed = discord.Embed(title="Policies", description="These are the three new policies. Use -discard <f/l> to discard a policy",
                           color=discord.Color.dark_red())
     embed.set_image(url="attachment://chancellor.png")
@@ -677,7 +677,7 @@ async def start_chancellor_legislative(game : Game):
 
 async def start_president_legislative(game : Game):
     game.president_legislative()
-    file = discord.File('game_files/president_'+str(game.game_id)+'.png', filename='president.png')
+    file = discord.File('secret_hitler/img/president_'+str(game.game_id)+'.png', filename='president.png')
     embed = discord.Embed(title="Policies", description="These are the three new policies. Use -discard <f/l> to discard a policy",
                           color=discord.Color.dark_red())
     embed.set_image(url="attachment://president.png")
@@ -802,13 +802,13 @@ async def sendRoles(game : Game):
         elif player.role == "Fascist":
             fascists.append(player)
         elif player.role == "Liberal":
-            file = discord.File("img/liberal_role.png", filename="role.png")
+            file = discord.File("secret_hitler/img/liberal_role.png", filename="role.png")
             embed = discord.Embed(title="Liberal", description="Liberal is your secret role.",
                                   color=discord.Color.blue())
             embed.set_image(url="attachment://role.png")
             await client.get_user(player.player_id).send(file=file, embed=embed)
 
-    file = discord.File("img/hitler_role.png", filename="role.png")
+    file = discord.File("secret_hitler/img/hitler_role.png", filename="role.png")
     embed = discord.Embed(title="Hitler", description="Hitler is your secret role.",
                           color=discord.Color.dark_red())
     if len(game.players) <= 6 and len(fascists) > 0:
@@ -817,7 +817,7 @@ async def sendRoles(game : Game):
     await client.get_user(hitler.player_id).send(file=file, embed=embed)
 
     for player in fascists:
-        file = discord.File("img/fascist_role.png", filename="role.png")
+        file = discord.File("secret_hitler/img/fascist_role.png", filename="role.png")
         embed = discord.Embed(title="Fascist", description="Fascist is your secret role.",
                               color=discord.Color.orange())
         embed.add_field(name="Hitler", value=client.get_user(hitler.player_id).name+" is hitler", inline=False)
