@@ -195,16 +195,16 @@ class Game:
     def return_path_to_fascist_board(self):
         if self.fascist_board == 0:
             if self.max_players < 7:
-                return 'img/FascistBoard1.png'
+                return 'secret_hitler/img/FascistBoard1.png'
             elif self.max_players < 9:
-                return 'img/FascistBoard2.png'
-            return 'img/FascistBoard3.png'
-        return "game_files/fascist_" + str(self.game_id) + ".png"
+                return 'secret_hitler/img/FascistBoard2.png'
+            return 'secret_hitler/img/FascistBoard3.png'
+        return "secret_hitler/img/fascist_" + str(self.game_id) + ".png"
 
     def return_path_to_liberal_board(self):
         if self.liberal_board == 0:
-            return 'img/LiberalBoard.png'
-        return "game_files/liberal_" + str(self.game_id) + ".png"
+            return 'secret_hitler/img/LiberalBoard.png'
+        return "secret_hitler/img/liberal_" + str(self.game_id) + ".png"
 
     def set_president(self):
         if self.president_id >= (len(self.players) - 1):
@@ -243,9 +243,9 @@ class Game:
         self.policies.append(policy2)
         self.policies.append(policy3)
 
-        img1 = Image.open('img/policy_liberal.png')
+        img1 = Image.open('secret_hitler/img/policy_liberal.png')
         img1 = img1.resize((292, 450))
-        img2 = Image.open('img/policy_fascist.png')
+        img2 = Image.open('secret_hitler/img/policy_fascist.png')
         img2 = img2.resize((292, 450))
 
         new_size = 3*292 + 20
@@ -265,16 +265,16 @@ class Game:
             img_new.paste(img1, (2*292+10,10))
         else:
             img_new.paste(img2, (2*292+10,10))
-        img_new.save("game_files/president_"+str(self.game_id)+".png")
+        img_new.save("secret_hitler/img/president_"+str(self.game_id)+".png")
 
     def policy_peek(self):
         policy1 = self.get_policy()
         policy2 = self.get_policy()
         policy3 = self.get_policy()
 
-        img1 = Image.open('img/policy_liberal.png')
+        img1 = Image.open('secret_hitler/img/policy_liberal.png')
         img1 = img1.resize((292, 450))
-        img2 = Image.open('img/policy_fascist.png')
+        img2 = Image.open('secret_hitler/img/policy_fascist.png')
         img2 = img2.resize((292, 450))
 
         new_size = 3 * 292 + 20
@@ -294,7 +294,7 @@ class Game:
             img_new.paste(img1, (2 * 292 + 10, 10))
         else:
             img_new.paste(img2, (2 * 292 + 10, 10))
-        img_new.save("game_files/policypeek_" + str(self.game_id) + ".png")
+        img_new.save("secret_hitler/img/policypeek_" + str(self.game_id) + ".png")
 
         self.deck.insert(0, policy3)
         self.deck.insert(0, policy2)
@@ -303,33 +303,33 @@ class Game:
         self.peeked = True
 
     def printBoard(self):
-        img1 = Image.open('img/liberal_policy.png')
+        img1 = Image.open('secret_hitler/img/liberal_policy.png')
 
-        img_new = Image.open('img/LiberalBoard.png')
+        img_new = Image.open('secret_hitler/img/LiberalBoard.png')
         for i in range(self.liberal_board):
             img_new.paste(img1, config.configuration["liberal_board"][i])
-        img_new.save("game_files/liberal_" + str(self.game_id) + ".png")
+        img_new.save("secret_hitler/img/liberal_" + str(self.game_id) + ".png")
 
-        img2 = Image.open('img/fascist_policy.png')
+        img2 = Image.open('secret_hitler/img/fascist_policy.png')
 
         if self.max_players < 7:
-            img_new_2 = Image.open('img/FascistBoard1.png')
+            img_new_2 = Image.open('secret_hitler/img/FascistBoard1.png')
         elif self.max_players < 9:
-            img_new_2 = Image.open('img/FascistBoard2.png')
+            img_new_2 = Image.open('secret_hitler/img/FascistBoard2.png')
         else:
-            img_new_2 = Image.open('img/FascistBoard3.png')
+            img_new_2 = Image.open('secret_hitler/img/FascistBoard3.png')
 
         for i in range(self.fascist_board):
             img_new_2.paste(img2, config.configuration["fascist_board"][i])
-        img_new_2.save("game_files/fascist_" + str(self.game_id) + ".png")
+        img_new_2.save("secret_hitler/img/fascist_" + str(self.game_id) + ".png")
 
     def chancellor_legislative(self):
         policy1 = self.policies[0]
         policy2 = self.policies[1]
 
-        img1 = Image.open('img/policy_liberal.png')
+        img1 = Image.open('secret_hitler/img/policy_liberal.png')
         img1 = img1.resize((292, 450))
-        img2 = Image.open('img/policy_fascist.png')
+        img2 = Image.open('secret_hitler/img/policy_fascist.png')
         img2 = img2.resize((292, 450))
 
         new_size = 2*292 + 20
@@ -345,7 +345,7 @@ class Game:
         else:
             img_new.paste(img2, (292+10,10))
 
-        img_new.save("game_files/chancellor_"+str(self.game_id)+".png")
+        img_new.save("secret_hitler/img/chancellor_"+str(self.game_id)+".png")
 
     def discard_policy(self, player_id, policy):
         policy = policy.upper()
