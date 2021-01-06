@@ -693,7 +693,7 @@ async def cleanup(guild):
             logger.info("Deleted channel: " + c.name)
         logger.debug("Deleting category: " + category.name)
         await category.delete()
-        logger.info("Deletedcategory: " + category.name)
+        logger.info("Deleted category: " + category.name)
     
     for e in await guild.fetch_emojis():
         if e.user.id == client.user.id:
