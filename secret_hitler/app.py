@@ -740,17 +740,14 @@ async def cleanup(guild):
 
 async def get_channel(name, category):
     # Returns the requested channel, creating it if it doesn't already exist
-    for c in category.channels:
-        if c.name == name:
-            return c
+
+    c = next((c for c in category.channels if c.name == name), None)
+    if c is not None: return c
 
     logger.debug("Creating channel: " + name)
     channel = await category.create_text_channel(name=name)
-    if(read_only):
-        await channel.set_permissions(category.guild.default_role, send_messages=False)
-        await channel.set_permissions(category.guild.me, send_messages=True)
     logger.debug("Created channel: " + name)
-
+    
     return channel
 
 
@@ -786,6 +783,8 @@ async def setup(guild):
             b = bytearray(f)
         await guild.create_custom_emoji(name=ename, image=b)
         logger.debug("Added custom emoji: " + ename)
+    
+    logger.info("Setup completed")
 
 
 async def init_channel_help(channel):
