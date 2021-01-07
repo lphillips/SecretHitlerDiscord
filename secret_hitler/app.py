@@ -1,27 +1,56 @@
 import os
 import discord
 import logging
+import asyncio
 from dotenv import load_dotenv
-from secret_hitler.game import Game, GameStates
 from discord.ext import commands
 from secret_hitler.game import Game, GameStates, Player
 from secret_hitler import config
 
-logFormatter = logging.Formatter('[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
+class DiscordChannelHandler(logging.Handler):
+    def __init__(self, channel=None):
+        logging.Handler.__init__(self)
+        self._channel = channel
+
+    def setChannel(self, channel=None):
+        self._channel = channel
+    
+    def emit(self, record):
+        if self._channel is not None:
+            try:
+                msg = self.format(record)
+                if record.levelno == logging.INFO:
+                    msg = f"```\n{msg}\n```"
+                elif record.levelno == logging.WARNING:
+                    msg = f"```fix\n{msg}\n```"
+                elif record.levelno == logging.ERROR:
+                    msg = f"```diff\n-{msg}\n```"
+                asyncio.create_task(self._channel.send(msg))
+            except Exception:
+                self.handleError(record)
+
+discordFormatter = logging.Formatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
 
 # log discord API messages to discord.log file
-discordLogger = logging.getLogger('discord')
+discordLogger = logging.getLogger("discord")
 discordLogger.setLevel(logging.DEBUG)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-handler.setFormatter(logFormatter)
-discordLogger.addHandler(handler)
+discordHandler = logging.FileHandler(filename="discord.log", encoding="utf-8", mode="w")
+discordHandler.setFormatter(discordFormatter)
+discordLogger.addHandler(discordHandler)
 
 # logger for this application
+formatter = logging.Formatter('[%(asctime)s][%(levelname)s][%(name)s] %(message)s')
 logger = logging.getLogger("secret_hitler")
 logger.setLevel(logging.DEBUG)
 handler = logging.StreamHandler()
-handler.setFormatter(logFormatter)
+handler.setFormatter(formatter)
 logger.addHandler(handler)
+
+channelFormatter = logging.Formatter("%(levelname)s -- %(message)s")
+channelHandler = DiscordChannelHandler()
+channelHandler.setLevel(logging.INFO)
+channelHandler.setFormatter(channelFormatter)
+logger.addHandler(channelHandler)
 
 #constants for ja or nein voting
 for e in config.configuration["emoji"]:
@@ -44,7 +73,7 @@ async def on_ready():
 
 
 @client.event
-async def on_guild_join(guild):
+async def on_guild_available(guild):
     await setup(guild)
 
 
@@ -688,23 +717,42 @@ async def start_president_legislative(game : Game):
 
 async def cleanup(guild):
     # Removes everything created by the setup function
+    channelHandler.setChannel(None)
     category = get_category(guild)
     if category is not None:
         for c in category.channels:
             logger.debug("Deleting channel: " + c.name)
             await c.delete()
-            logger.info("Deleted channel: " + c.name)
+            logger.debug("Deleted channel: " + c.name)
         logger.debug("Deleting category: " + category.name)
         await category.delete()
-        logger.info("Deleted category: " + category.name)
+        logger.debug("Deleted category: " + category.name)
     
     for e in await guild.fetch_emojis():
         if e.user.id == client.user.id:
             logger.debug("Deleting emoji: " + e.name)
             await e.delete()
-            logger.info("Deleted emoji: " + e.name)
+            logger.debug("Deleted emoji: " + e.name)
+    
+    logger.info("Completed cleanup of emojis and channels")
 
     
+
+async def get_channel(name, category):
+    # Returns the requested channel, creating it if it doesn't already exist
+    for c in category.channels:
+        if c.name == name:
+            return c
+
+    logger.debug("Creating channel: " + name)
+    channel = await category.create_text_channel(name=name)
+    if(read_only):
+        await channel.set_permissions(category.guild.default_role, send_messages=False)
+        await channel.set_permissions(category.guild.me, send_messages=True)
+    logger.debug("Created channel: " + name)
+
+    return channel
+
 
 async def setup(guild):
     # Makes the guild ready to handle Games
@@ -712,38 +760,23 @@ async def setup(guild):
     #create a new category for the guild channels if it doesn't exist
     category = get_category(guild)
     if category is None:
-        logger.debug("Creating category: " + config.configuration['category'])
-        category = await guild.create_category(name=config.configuration['category'])
-        logger.info("Created category: " + category.name)
+        logger.debug("Creating category: " + config.configuration["category"])
+        category = await guild.create_category(name=config.configuration["category"])
+        logger.debug("Created category: " + category.name)
     else:
-        logger.info("Found existing category: " + category.name)
+        logger.debug("Found existing category: " + category.name)
 
-    # create channels if they don't exist
-    channels = list(config.configuration["channels"])
-    for c in category.channels:
-        if c.name in channels:
-            logger.info("Found existing channel: " + c.name)
-            channels.remove(c.name)
-    
-    for c in channels:
-        # if there is a "print<channel name>" function, call it when creating the channel
-        # those channels also should be set to prevent users sending messages
-        logger.debug("Creating channel: " + c)
-        printFunc = "print" + c.capitalize()
-        if printFunc in globals():
-            await globals()[printFunc](await guild.create_text_channel(name=c, category=category, overwrites={
-                    guild.default_role: discord.PermissionOverwrite(send_messages=False),
-                    guild.me: discord.PermissionOverwrite(send_messages=True)
-                }))
-        else:
-            await guild.create_text_channel(name=c, category=category)
-        logger.info("Created channel: " + c)
+    for c in config.configuration["channels"]:
+        channel = await get_channel(name=c, category=category)
+        initFunc = "init_channel_" + c
+        if initFunc in globals():
+            await globals()[initFunc](channel)
 
     # Add custom emojis if they aren't already added
     emojis = dict(config.configuration["emoji"])
     for e in guild.emojis:
         if e.name in emojis:
-            logger.info("Found existing emoji: " + e.name)
+            logger.debug("Found existing emoji: " + e.name)
             del emojis[e.name]
     
     for ename, efile in emojis.items():
@@ -752,7 +785,52 @@ async def setup(guild):
             f = image.read()
             b = bytearray(f)
         await guild.create_custom_emoji(name=ename, image=b)
-        logger.info("Added custom emoji: " + ename)
+        logger.debug("Added custom emoji: " + ename)
+
+
+async def init_channel_help(channel):
+    if channel.topic is None:
+        logger.debug("Setting help channel topic and overwrites")
+        await channel.edit(topic="Command Reference for the Secret Hitler Bot", overwrites={
+            channel.guild.default_role: discord.PermissionOverwrite(send_messages=False),
+            channel.guild.me: discord.PermissionOverwrite(send_messages=True)
+            })
+        await printHelp(channel)
+
+
+async def init_channel_license(channel):
+    if channel.topic is None:
+        logger.debug("Setting license channel topic and overwrites")
+        await channel.edit(topic="The License of Secret Hitler and the Secret Hitler Bot", overwrites={
+            channel.guild.default_role: discord.PermissionOverwrite(send_messages=False),
+            channel.guild.me: discord.PermissionOverwrite(send_messages=True)
+            })
+        await printLicense(channel)
+
+
+async def init_channel_rules(channel):
+    if channel.topic is None:
+        logger.debug("Setting rules channel topic and overwrites")
+        await channel.edit(topic="The Rules of Secret Hitler", overwrites={
+            channel.guild.default_role: discord.PermissionOverwrite(send_messages=False),
+            channel.guild.me: discord.PermissionOverwrite(send_messages=True)
+            })
+        await printRules(channel)
+
+
+async def init_channel_logs(channel):
+    if channel.topic is None:
+        logger.debug("Setting logs channel topic and overwrites")
+        await channel.edit(topic="Debug logs from the Secret Hitler game engine", overwrites={
+            channel.guild.default_role: discord.PermissionOverwrite(send_messages=False),
+            channel.guild.me: discord.PermissionOverwrite(send_messages=True)
+            })
+    channelHandler.setChannel(channel)
+
+
+async def init_channel_lobby(channel):
+    if channel.topic is None:
+        await channel.edit(topic="A place to hangout while waiting for your Secret Hitler game to start")
 
 
 async def start_nomination(game : Game):
