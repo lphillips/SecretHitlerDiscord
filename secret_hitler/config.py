@@ -118,6 +118,7 @@ configuration = {
     "category": "Secret Hitler",
     # channel names
     "channels": [
+        "logs",
         "rules",
         "help",
         "license",
