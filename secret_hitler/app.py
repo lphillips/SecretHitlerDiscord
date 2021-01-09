@@ -7,6 +7,7 @@ from discord.ext import commands
 from secret_hitler.game import Game, GameStates, Player
 from secret_hitler import config
 
+
 class DiscordChannelHandler(logging.Handler):
     def __init__(self, channel=None):
         logging.Handler.__init__(self)
@@ -28,6 +29,7 @@ class DiscordChannelHandler(logging.Handler):
                 asyncio.create_task(self._channel.send(msg))
             except Exception:
                 self.handleError(record)
+
 
 discordFormatter = logging.Formatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
 
@@ -52,12 +54,12 @@ channelHandler.setLevel(logging.INFO)
 channelHandler.setFormatter(channelFormatter)
 logger.addHandler(channelHandler)
 
-#constants for ja or nein voting
-for e in config.configuration["emoji"]:
-    if "ja" in e:
-        JA=e
-    elif "nein" in e:
-        NEIN=e
+# constants for ja or nein voting
+for emoji in config.configuration["emoji"]:
+    if "ja" in emoji:
+        JA = emoji
+    elif "nein" in emoji:
+        NEIN = emoji
 
 client = commands.Bot(command_prefix="-")
 client.remove_command(name='help')
@@ -221,9 +223,9 @@ async def roletest(ctx):
     await ctx.send(file=file, embed=embed)
 
 
-@client.command(name='startgame')
-async def start_game(ctx, mode, players : int):
-    category = get_category(ctx.guild)
+@client.command(name="startgame")
+async def start_game(ctx, mode, players: int):
+    category = __get_category(ctx.guild)
     if category is None:
         await ctx.send("Secret Hitler is not enabled on this server. Please execute -setup to enable it")
         return
@@ -243,14 +245,23 @@ async def start_game(ctx, mode, players : int):
 
     game_id = k+1
 
-    role = await ctx.guild.create_role(name='game_'+str(game_id)+'_member')
-    admin_role = await ctx.guild.create_role(name='game_'+str(game_id)+'_administrator')
-    await ctx.message.author.add_roles(role)
-    await ctx.message.author.add_roles(admin_role)
+    try:
+        role = await ctx.guild.create_role(name="game_"+str(game_id)+"_member")
+        admin_role = await ctx.guild.create_role(name="game_"+str(game_id)+"_administrator")
+        await ctx.message.author.add_roles(role)
+        await ctx.message.author.add_roles(admin_role)
+    except discord.Forbidden as e:
+        discordLogger.error("discord.Forbidden exception raised in startgame. Bot is missing 'Manage Roles' permission. Exception="+repr(e))
+        await ctx.send("SecretHitler bot is missing 'Manage Role' permission. Add this permission for the bot in the Discord developer portal")
+        return
+    except Exception as e:
+        discordLogger.error("Exception occurred during startgame. Exception="+repr(e))
+        await ctx.send("SecretHitler bot failed to create the game")
+        return
 
     overwrites = {}
     channel_overwrites = {}
-    if mode.lower() == 'private':
+    if mode.lower() == "private":
         channel_overwrites = {
             ctx.guild.default_role: discord.PermissionOverwrite(view_channel=False),
             role: discord.PermissionOverwrite(view_channel=True)
@@ -261,17 +272,19 @@ async def start_game(ctx, mode, players : int):
             role: discord.PermissionOverwrite(read_messages=True)
         }
 
-    channel = await ctx.guild.create_text_channel(name='game_'+str(game_id), category=category, overwrites=overwrites)
-    await ctx.guild.create_voice_channel(name='game_'+str(game_id), category=category, overwrites=channel_overwrites)
+    # TODO: Catch exceptions from create_text_channel and create_voice_channel
+    channel = await ctx.guild.create_text_channel(name="game_"+str(game_id), category=category, overwrites=overwrites)
+    await ctx.guild.create_voice_channel(name="game_"+str(game_id), category=category, overwrites=channel_overwrites)
 
     running_games[game_id] = Game(channel.id, game_id, players, ctx.message.author.id)
 
-    embed = discord.Embed(title='Starting SecretHitler...', description='Waiting for other players')
-    embed.add_field(name='Slots', value='1/'+str(players))
-    if mode.lower() == 'private':
-        embed.add_field(name='Private Game', value='This is a private game. Invite other players by using -invite <playername>. Ensure the player is ready to play and on the server', inline=False)
+    # TODO: Determine if this code block can raise an exception
+    embed = discord.Embed(title="Starting SecretHitler...", description="Waiting for other players")
+    embed.add_field(name="Slots", value="1/"+str(players))
+    if mode.lower() == "private":
+        embed.add_field(name="Private Game", value="This is a private game. Invite other players by using -invite <playername>. Ensure the player is ready to play and on the server", inline=False)
     else:
-        embed.add_field(name='Public Game', value='This is a public game. To join it click on the reaction below!', inline=False)
+        embed.add_field(name="Public Game", value="This is a public game. To join it click on the reaction below!", inline=False)
 
     message = await channel.send(embed=embed)
 
@@ -715,10 +728,11 @@ async def start_president_legislative(game : Game):
     embed.set_image(url="attachment://president.png")
     msg = await client.get_user(game.president.player_id).send(embed=embed, file=file)
 
+
 async def cleanup(guild):
     # Removes everything created by the setup function
     channelHandler.setChannel(None)
-    category = get_category(guild)
+    category = __get_category(guild)
     if category is not None:
         for c in category.channels:
             logger.debug("Deleting channel: " + c.name)
@@ -736,7 +750,6 @@ async def cleanup(guild):
     
     logger.info("Completed cleanup of emojis and channels")
 
-    
 
 async def get_channel(name, category):
     # Returns the requested channel, creating it if it doesn't already exist
@@ -753,9 +766,8 @@ async def get_channel(name, category):
 
 async def setup(guild):
     # Makes the guild ready to handle Games
-
-    #create a new category for the guild channels if it doesn't exist
-    category = get_category(guild)
+    # create a new category for the guild channels if it doesn't exist
+    category = __get_category(guild)
     if category is None:
         logger.debug("Creating category: " + config.configuration["category"])
         category = await guild.create_category(name=config.configuration["category"])
@@ -841,10 +853,10 @@ async def start_nomination(game : Game):
     await client.get_channel(game.channel_id).send(embed=embed)
 
 
-def get_category(guild):
+def __get_category(guild):
     categories = guild.categories
     for category in categories:
-        if category.name == config.configuration['category']:
+        if category.name == config.configuration["category"]:
             return category
     return None
 
@@ -958,10 +970,11 @@ async def printHelp(channel):
     await channel.send(embed=embed)
 
 
-load_dotenv()
-token = os.getenv("SECRET_HITLER_DISCORD_TOKEN")
+def start_app():
+    load_dotenv()
+    token = os.getenv("SECRET_HITLER_DISCORD_TOKEN")
 
-if token is None:
-    raise RuntimeError("SECRET_HITLER_DISCORD_TOKEN environment variable not set")
+    if token is None:
+        raise RuntimeError("SECRET_HITLER_DISCORD_TOKEN environment variable not set")
 
-client.run(token)
+    client.run(token)
