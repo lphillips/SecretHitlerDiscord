@@ -16,9 +16,9 @@ Ensure the following tools and libraries are installed.
 
 1. Install Python 3.5 or higher (https://www.python.org/downloads/)
 2. Install `git`. `git` is likely already installed on Unix or macOS, but you can get the latest command line `git` at https://git-scm.com/downloads. If you prefer a GUI, https://desktop.github.com/ is GitHub's GUI client, and there are many other GUI wrappers around `git`.
-3. Install `pillow` and `discord.py` via
+3. Install `pillow`, `python-dotenv`, and `discord.py` via
  ```
- pip3 install pillow && pip3 install discord.py
+ pip3 install pillow && pip3 install python-dotenv && pip3 install discord.py
  ```
 
 ### Create a Discord application
@@ -31,22 +31,19 @@ You will need to create an application and bot on Discord at https://discord.com
 5. Paste the copied link into the browser address bar and go through the bot invitation flow. The bot is now invited to your server.
 
 ### Start SecretHitlerDiscord
-The application must be running for the Discord bot to be able to respond to commands from users in Discord. First, you must set up the code to use the OAuth2 token generated when you created the application on Discord's developer site.
-
-Open `main.py`, and scroll to the bottom to find this line:
-```
-client.run('TOKEN')
-```
-
-Replace `TOKEN` with your OAuth2 token, copied from the "Bot" section on your application's page on the Discord developer portal.
+The application must be running for the Discord bot to be able to respond to commands from users in Discord. 
+First, you must set up the code to use the OAuth2 token generated when you created the application on Discord's developer site. 
+Open the "Bot" tab for the application on the Discord developer portal, and click the "Copy" button for the bot token, near the app icon.
 
 ![Discord developer portal screenshot](docs/img/discord_bot_oauth2.png)
 
-Click the "Copy" button to copy the token to the clipboard and replace the text "TOKEN" with the copied token string.
-
+In the home directory for the user that will run the application, create a `.env` file if one does not already exist. 
+Add the following line to the `.env` file:
 ```
-// TODO: Update these docs with how to set up the token as an environment variable as part of https://github.com/lphillips/SecretHitlerDiscord/issues/8.
+SECRET_HITLER_DISCORD_TOKEN=<app token copied from developer portal>
 ```
+Paste the copied token string after the `=` and save the `.env` file. The application will read the token from the environment
+file.
 
 Start the server by running:
 ```
