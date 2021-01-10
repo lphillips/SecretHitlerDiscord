@@ -137,7 +137,8 @@ class Game:
                 policy = self.get_policy()
                 self.place_policy(policy)
                 if self.state == GameStates.GAME_OVER:
-                    return True
+                    self.policies.clear()
+                    return False
                 self.policies.clear()
                 if policy == 'L':
                     self.state = GameStates.NOMINATION
