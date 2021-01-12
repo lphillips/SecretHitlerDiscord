@@ -1,5 +1,10 @@
 configuration = {
     # Only for testing
+    1: {
+       "roles": [
+           "Hitler"
+       ]
+    },
     2: {
        "roles": [
            "Liberal",

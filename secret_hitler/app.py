@@ -76,6 +76,16 @@ async def on_ready():
 async def on_guild_available(guild):
     await setup(guild)
 
+@client.event
+async def on_member_update(before, after):
+    game = get_game_with_player(before.id)
+    if game is not None:
+        player = game.get_player(before.id)
+        player.id = after.id
+        player.display_name = after.display_name
+        player.avatar_url = after.avatar_url
+    
+
 
 @client.event
 async def on_reaction_add(reaction, user):
@@ -102,8 +112,8 @@ async def on_reaction_add(reaction, user):
         if len(game.votes) == len(game.players):
             if game.calculate_votes():
                 # Start Legislative Session
-                embed = discord.Embed(title="New Chancellor", description=client.get_user(game.chancellor.player_id).name + " is the new chancellor. Legislative Session starts now", color=discord.Color.dark_red())
-                embed.set_thumbnail(url=client.get_user(game.chancellor.player_id).avatar_url)
+                embed = discord.Embed(title="New Chancellor", description=chancellor.display_name + " is the new chancellor. Legislative Session starts now", color=discord.Color.dark_red())
+                embed.set_thumbnail(url=game.chancellor.avatar_url)
                 await client.get_channel(game.channel_id).send(embed=embed)
                 await start_president_legislative(game)
                 return
@@ -233,7 +243,7 @@ async def start_game(ctx, mode, players : int):
         await ctx.send("You can't create a game, because you already joined one!")
         return
 
-    if players > 10 or players < 5:
+    if players > 10: # or players < 5: #allowing smaller game options for testing
         await ctx.send("You have to choose between 5-10 players!")
         return
 
@@ -265,6 +275,7 @@ async def start_game(ctx, mode, players : int):
     await ctx.guild.create_voice_channel(name='game_'+str(game_id), category=category, overwrites=channel_overwrites)
 
     running_games[game_id] = Game(channel.id, game_id, players, ctx.message.author.id)
+    running_games[game_id].add_player(ctx.message.author.id, ctx.message.author.display_name, ctx.message.author.avatar_url)
 
     embed = discord.Embed(title='Starting SecretHitler...', description='Waiting for other players')
     embed.add_field(name='Slots', value='1/'+str(players))
@@ -279,26 +290,45 @@ async def start_game(ctx, mode, players : int):
         await message.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
 
 
+@client.command(name='runtest')
+async def runtest(ctx, data : str):
+    # generic command to use to test api calls without having to restart the server over and over
+    # this code should get removed eventually, but I'm leaving it in place for now since I'm sure
+    # it will be helpful to have this while we work on it.
+
+    # the code below was to figure out what data different api objects had about users
+    game = get_game_with_player(ctx.message.author.id)
+    playerc = client.get_user(game.players[0].player_id)
+    logger.debug("playerc:" + str(playerc))
+    logger.debug("playerc.name: " + playerc.name)
+    logger.debug("playerc.display_name: " + playerc.display_name)
+
+    playerg = await ctx.guild.fetch_member(game.players[0].player_id)
+    logger.debug("playerg:" + str(playerg))
+    logger.debug("playerg.name: " + playerg.name)
+    logger.debug("playerg.display_name: " + playerg.display_name)
+
+
 @client.command(name='invite')
-async def invite(ctx, player : commands.MemberConverter):
+async def invite(ctx, member : commands.MemberConverter):
     game = get_game_with_player(ctx.message.author.id)
     if game is None:
         await ctx.send("You can't invite someone because you are not in a game")
         return
 
-    is_in_game = get_game_with_player(player.id)
+    is_in_game = get_game_with_player(member.id)
     if is_in_game:
         await ctx.send("You can't invite this player because he already joined a game!")
         return
 
     role = discord.utils.get(ctx.guild.roles, name='game_' + str(game.get_id()) + '_member')
-    if not game.add_player(player.id):
+    if not game.add_player(member.id, member.display_name, member.avatar_url):
         await ctx.send("This game is already full")
         return
-    await player.add_roles(role)
+    await member.add_roles(role)
     embed = discord.Embed(title="Secret Hitler", description="You have been added to a SecretHitler game. The round will start as soon enough players have joined")
     embed.add_field(name="Game channel", value="Visit the channel #game_"+ str(game.get_id())+ ". The game will be processed in there. You will receive important information like your role as a Direct Message")
-    await player.send(embed=embed)
+    await member.send(embed=embed)
 
     if game.start_game():
         await client.get_channel(game.channel_id).send("All players joined the game. Let's get it started. Ha.")
@@ -307,7 +337,7 @@ async def invite(ctx, player : commands.MemberConverter):
         await sendBoard(game)
         await start_nomination(game)
     else:
-        embed = discord.Embed(title='Player joined the game', description='The player '+str(player.name)+' joined the game! Waiting for more players', color=discord.Color.dark_red())
+        embed = discord.Embed(title='Player joined the game', description='The player '+member.display_name+' joined the game! Waiting for more players', color=discord.Color.dark_red())
         embed.add_field(name="Slots", value=str(len(game.players))+"/"+str(game.max_players))
         await client.get_channel(game.channel_id).send(embed=embed)
 
@@ -343,7 +373,7 @@ async def stop_game(ctx, id : int):
 
 
 @client.command(name='nominate')
-async def nominate(ctx, player : commands.MemberConverter):
+async def nominate(ctx, member : commands.MemberConverter):
     game = get_game_with_player(ctx.message.author.id)
     if not game:
         await ctx.send("You are not in a game")
@@ -353,11 +383,13 @@ async def nominate(ctx, player : commands.MemberConverter):
         await ctx.send("You are not the president")
         return
 
-    if not game.has_player(player.id):
+    player = game.get_player(member.id)
+    if player is None:
         await ctx.send("This player is not in the same game as you")
         return
 
     if game.state is not GameStates.NOMINATION:
+        #TODO error message
         await ctx.message.delete()
         return
 
@@ -366,7 +398,7 @@ async def nominate(ctx, player : commands.MemberConverter):
         return
 
     await ctx.message.delete()
-    embed = discord.Embed(title='Player '+player.name+' was nominated for chancellor', description="Please react to this message with Ja or Nein to vote", color=discord.Color.dark_red())
+    embed = discord.Embed(title='Player '+player.display_name+' was nominated for chancellor', description="Please react to this message with Ja or Nein to vote", color=discord.Color.dark_red())
     embed.set_thumbnail(url=player.avatar_url)
     msg = await client.get_channel(game.channel_id).send(embed=embed)
     await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
@@ -453,7 +485,7 @@ async def discard(ctx, card):
 
 
 @client.command(name='president')
-async def president(ctx, player : commands.UserConverter):
+async def president(ctx, user : commands.UserConverter):
     game = get_game_with_player(ctx.message.author.id)
     if not game:
         await ctx.send("You are not in a game")
@@ -467,11 +499,10 @@ async def president(ctx, player : commands.UserConverter):
         await ctx.send("You are not the president")
         return
 
-    if not game.has_player(player.id):
+    player = game.get_player(user.id)
+    if not player:
         await ctx.send("This player is not in the same game as you")
         return
-
-    player = game.get_player(player.id)
 
     game.peeked = True
 
@@ -481,7 +512,7 @@ async def president(ctx, player : commands.UserConverter):
     await start_nomination(game)
 
 @client.command(name='investigate')
-async def investigate(ctx, player : commands.UserConverter):
+async def investigate(ctx, user : commands.UserConverter):
     game = get_game_with_player(ctx.message.author.id)
     if not game:
         await ctx.send("You are not in a game")
@@ -495,19 +526,18 @@ async def investigate(ctx, player : commands.UserConverter):
         await ctx.send("You are not the president")
         return
 
-    if not game.has_player(player.id):
+    player = game.get_player(user.id)
+    if not player:
         await ctx.send("This player is not in the same game as you")
         return
-
-    party = game.get_player(player.id).get_party()
 
     if game.fascist_board == 1:
         game.investigated_one = True
     else:
         game.investigated = True
 
-    embed = discord.Embed(title='Investigation', description='Player '+client.get_user(player.id).name +' is a '+party, color=discord.Color.dark_red())
-    embed.set_thumbnail(url=client.get_user(player.id).avatar_url)
+    embed = discord.Embed(title='Investigation', description='Player '+player.display_name +' is a '+player.get_party(), color=discord.Color.dark_red())
+    embed.set_thumbnail(url=player.avatar_url)
 
     await ctx.message.delete()
 
@@ -594,7 +624,7 @@ async def decline(ctx):
 
 
 @client.command(name='execute')
-async def execute(ctx, player : commands.UserConverter):
+async def execute(ctx, user : commands.UserConverter):
     game = get_game_with_player(ctx.message.author.id)
     if not game:
         await ctx.send("You are not in a game")
@@ -608,11 +638,12 @@ async def execute(ctx, player : commands.UserConverter):
         await ctx.send("You are not the president")
         return
 
-    if not game.has_player(player.id):
+    player = game.get_player(user.id)
+    if not player:
         await ctx.send("This player is not in the same game as you")
         return
 
-    executed = game.execute_player(player.id)
+    executed = game.execute_player(player.player_id)
     if executed is None:
         await ctx.send("This player could not be executed")
         return
@@ -633,9 +664,9 @@ async def execute(ctx, player : commands.UserConverter):
                               description=game.winner + 's won the game. Use -restart to restart the game.',
                               color=discord.Color.dark_red())
         for player in game.players:
-            embed.add_field(name=client.get_user(player.player_id).name, value=player.role, inline=False)
+            embed.add_field(name=player.display_name, value=player.role, inline=False)
         for player in game.dead:
-            embed.add_field(name=client.get_user(executed.player_id).name, value=player.role, inline=False)
+            embed.add_field(name=player.display_name, value=player.role, inline=False)
         await client.get_channel(game.channel_id).send(embed=embed)
     elif len(game.players) <= 1:
         game.state = GameStates.GAME_OVER
@@ -644,9 +675,9 @@ async def execute(ctx, player : commands.UserConverter):
                               description=game.winner + 's won the game. Use -restart to restart the game.',
                               color=discord.Color.dark_red())
         for player in game.players:
-            embed.add_field(name=client.get_user(player.player_id).name, value=player.role, inline=False)
+            embed.add_field(name=player.display_name, value=player.role, inline=False)
         for player in game.dead:
-            embed.add_field(name=client.get_user(executed.player_id).name, value=player.role, inline=False)
+            embed.add_field(name=player.display_name, value=player.role, inline=False)
         await client.get_channel(game.channel_id).send(embed=embed)
     elif len(liberal) == 0:
         game.state = GameStates.GAME_OVER
@@ -663,8 +694,8 @@ async def execute(ctx, player : commands.UserConverter):
                               color=discord.Color.dark_red())
         await client.get_channel(game.channel_id).send(embed=embed)
     else:
-        embed = discord.Embed(title='Player executed', description=client.get_user(executed.player_id).name+ " was executed.")
-        embed.set_thumbnail(url=client.get_user(executed.player_id).avatar_url)
+        embed = discord.Embed(title='Player executed', description=player.display_name+ " was executed.")
+        embed.set_thumbnail(url=player.avatar_url)
         await client.get_channel(game.channel_id).send(embed=embed)
         game.state = GameStates.NOMINATION
         game.set_president()
@@ -833,9 +864,9 @@ async def init_channel_lobby(channel):
 
 
 async def start_nomination(game : Game):
-    embed = discord.Embed(title='Starting election', description=client.get_user(
-        game.president.player_id).name + ' is president. Please nominate your chancellor candidate! Use -nominate <username>',
-                          color=discord.Color.dark_red())
+    embed = discord.Embed(title="Starting election", description=game.president.display_name + 
+                        " is president. Please nominate your chancellor candidate! Use -nominate <username>", 
+                        color=discord.Color.dark_red())
     embed.set_thumbnail(url=client.get_user(game.president.player_id).avatar_url)
     game.start_nomination()
     await client.get_channel(game.channel_id).send(embed=embed)
@@ -844,7 +875,7 @@ async def start_nomination(game : Game):
 def get_category(guild):
     categories = guild.categories
     for category in categories:
-        if category.name == config.configuration['category']:
+        if category.name == config.configuration["category"]:
             return category
     return None
 
@@ -859,7 +890,7 @@ def get_game_with_player(player):
 async def send_players_info(game: Game):
     embed = discord.Embed(title='Player Information', description='Player IDs of all players in this Game!', color=discord.Color.dark_red())
     for i in range(len(game.players)):
-        embed.add_field(name='Player '+str(i+1), value=str(client.get_user(game.players[i].player_id).name))
+        embed.add_field(name='Player '+str(i+1), value=players[i].display_name)
     await client.get_channel(game.channel_id).send(embed=embed)
 
 
@@ -892,7 +923,7 @@ async def sendRoles(game : Game):
     embed = discord.Embed(title="Hitler", description="Hitler is your secret role.",
                           color=discord.Color.dark_red())
     if len(game.players) <= 6 and len(fascists) > 0:
-        embed.add_field(name="Fascist", value="The fascist is "+client.get_user(fascists[0].player_id).name)
+        embed.add_field(name="Fascist", value="The fascist is "+fascists[0].display_name)
     embed.set_image(url="attachment://role.png")
     await client.get_user(hitler.player_id).send(file=file, embed=embed)
 
@@ -900,10 +931,10 @@ async def sendRoles(game : Game):
         file = discord.File("secret_hitler/img/fascist_role.png", filename="role.png")
         embed = discord.Embed(title="Fascist", description="Fascist is your secret role.",
                               color=discord.Color.orange())
-        embed.add_field(name="Hitler", value=client.get_user(hitler.player_id).name+" is hitler", inline=False)
+        embed.add_field(name="Hitler", value=hitler.display_name+" is hitler", inline=False)
         if len(game.players) > 6:
             for fas in fascists:
-                embed.add_field(name="Fascist", value=client.get_user(fas.player_id).name, inline=False)
+                embed.add_field(name="Fascist", value=fas.display_name, inline=False)
         embed.set_image(url="attachment://role.png")
         await client.get_user(player.player_id).send(file=file, embed=embed)
 

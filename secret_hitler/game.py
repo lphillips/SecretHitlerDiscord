@@ -5,10 +5,12 @@ from secret_hitler import config
 
 
 class Player:
-    def __init__(self, player_id):
+    def __init__(self, player_id, display_name, avatar_url):
         self.player_id = player_id
         self.role = None
         self.dead = False
+        self.display_name = display_name
+        self.avatar_url = avatar_url
 
     def get_id(self):
         return self.player_id
@@ -50,13 +52,12 @@ class Game:
         self.players = []
         self.dead = []
         self.state = GameStates.GAME_STARTING
-        self.add_player(admin_id)
         self.votes = {}
 
-    def add_player(self, player_id):
+    def add_player(self, player_id, display_name, avatar_url):
         if len(self.players) == self.max_players:
             return False
-        self.players.append(Player(player_id))
+        self.players.append(Player(player_id, display_name, avatar_url))
         return True
 
     def start_game(self):
