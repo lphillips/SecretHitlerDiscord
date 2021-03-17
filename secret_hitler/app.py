@@ -7,6 +7,7 @@ from discord.ext import commands
 from secret_hitler.game import Game, GameStates, Player
 from secret_hitler import config
 
+
 class DiscordChannelHandler(logging.Handler):
     def __init__(self, channel=None):
         logging.Handler.__init__(self)
@@ -14,7 +15,7 @@ class DiscordChannelHandler(logging.Handler):
 
     def setChannel(self, channel=None):
         self._channel = channel
-    
+
     def emit(self, record):
         if self._channel is not None:
             try:
@@ -28,6 +29,7 @@ class DiscordChannelHandler(logging.Handler):
                 asyncio.create_task(self._channel.send(msg))
             except Exception:
                 self.handleError(record)
+
 
 discordFormatter = logging.Formatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
 
@@ -52,12 +54,12 @@ channelHandler.setLevel(logging.INFO)
 channelHandler.setFormatter(channelFormatter)
 logger.addHandler(channelHandler)
 
-#constants for ja or nein voting
+# constants for ja or nein voting
 for e in config.configuration["emoji"]:
     if "ja" in e:
-        JA=e
+        JA = e
     elif "nein" in e:
-        NEIN=e
+        NEIN = e
 
 client = commands.Bot(command_prefix="-")
 client.remove_command(name='help')
@@ -65,6 +67,8 @@ client.remove_command(name='help')
 running_games = {}
 
 # Events
+
+
 @client.event
 async def on_ready():
     logger.info('We have logged in as {0.user}'.format(client))
@@ -84,7 +88,7 @@ async def on_member_update(before, after):
         player.id = after.id
         player.display_name = after.display_name
         player.avatar_url = after.avatar_url
-    
+
 
 
 @client.event
@@ -188,15 +192,19 @@ async def on_reaction_add(reaction, user):
 
 
 # Commands
+
+
 @client.command(name='setup')
 @commands.has_permissions(administrator=True)
 async def setup(ctx):
     await setup(ctx.guild)
 
+
 @client.command(name='cleanup')
 @commands.has_permissions(administrator=True)
 async def cleanup(ctx):
     await cleanup(ctx.guild)
+
 
 @client.command(name='rules')
 async def rules(ctx):
@@ -404,6 +412,7 @@ async def nominate(ctx, member : commands.MemberConverter):
     await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
     await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
 
+
 @client.command(name='discard')
 async def discard(ctx, card):
     game = get_game_with_player(ctx.message.author.id)
@@ -511,6 +520,7 @@ async def president(ctx, user : commands.UserConverter):
 
     await start_nomination(game)
 
+
 @client.command(name='investigate')
 async def investigate(ctx, user : commands.UserConverter):
     game = get_game_with_player(ctx.message.author.id)
@@ -546,7 +556,6 @@ async def investigate(ctx, user : commands.UserConverter):
     game.set_president()
 
     await start_nomination(game)
-
 
 
 @client.command(name='veto')
@@ -746,6 +755,7 @@ async def start_president_legislative(game : Game):
     embed.set_image(url="attachment://president.png")
     msg = await client.get_user(game.president.player_id).send(embed=embed, file=file)
 
+
 async def cleanup(guild):
     # Removes everything created by the setup function
     channelHandler.setChannel(None)
@@ -758,34 +768,41 @@ async def cleanup(guild):
         logger.debug("Deleting category: " + category.name)
         await category.delete()
         logger.debug("Deleted category: " + category.name)
-    
+
     for e in await guild.fetch_emojis():
         if e.user.id == client.user.id:
             logger.debug("Deleting emoji: " + e.name)
             await e.delete()
             logger.debug("Deleted emoji: " + e.name)
-    
+
     logger.info("Completed cleanup of emojis and channels")
 
-    
 
 async def get_channel(name, category):
     # Returns the requested channel, creating it if it doesn't already exist
 
     c = next((c for c in category.channels if c.name == name), None)
-    if c is not None: return c
+    if c is not None:
+        return c
 
     logger.debug("Creating channel: " + name)
     channel = await category.create_text_channel(name=name)
     logger.debug("Created channel: " + name)
-    
+
     return channel
 
 
 async def setup(guild):
+    # Test if required permissions are available
+    bot_has_required_permissions = verify_permissions(guild)
+
+    if not bot_has_required_permissions:
+        logger.error("Setup aborted because bot does not have all required permissions")
+        return False
+
     # Makes the guild ready to handle Games
 
-    #create a new category for the guild channels if it doesn't exist
+    # create a new category for the guild channels if it doesn't exist
     category = get_category(guild)
     if category is None:
         logger.debug("Creating category: " + config.configuration["category"])
@@ -796,9 +813,9 @@ async def setup(guild):
 
     for c in config.configuration["channels"]:
         channel = await get_channel(name=c, category=category)
-        initFunc = "init_channel_" + c
-        if initFunc in globals():
-            await globals()[initFunc](channel)
+        init_func = "init_channel_" + c
+        if init_func in globals():
+            await globals()[init_func](channel)
 
     # Add custom emojis if they aren't already added
     emojis = dict(config.configuration["emoji"])
@@ -806,16 +823,37 @@ async def setup(guild):
         if e.name in emojis:
             logger.debug("Found existing emoji: " + e.name)
             del emojis[e.name]
-    
+
     for ename, efile in emojis.items():
         logger.debug("Adding custom emoji: " + ename)
-        with open(efile,'rb') as image:
+        with open(efile, 'rb') as image:
             f = image.read()
             b = bytearray(f)
         await guild.create_custom_emoji(name=ename, image=b)
         logger.debug("Added custom emoji: " + ename)
-    
+
     logger.info("Setup completed")
+    return True
+
+
+def verify_permissions(guild):
+    required_permissions = discord.Permissions(
+        manage_roles=True,
+        manage_emojis=True,
+        manage_channels=True,
+        send_messages=True
+    )
+
+    if not guild.me.guild_permissions.manage_roles:
+        logger.error("Bot is missing 'manage_roles' permission")
+    if not guild.me.guild_permissions.manage_emojis:
+        logger.error("Bot is missing 'manage_emojis' permission")
+    if not guild.me.guild_permissions.manage_channels:
+        logger.error("Bot is missing 'manage_channels' permission")
+    if not guild.me.guild_permissions.send_messages:
+        logger.error("Bot is missing'send_messages' permission")
+
+    return guild.me.guild_permissions.is_superset(required_permissions)
 
 
 async def init_channel_help(channel):
@@ -864,8 +902,8 @@ async def init_channel_lobby(channel):
 
 
 async def start_nomination(game : Game):
-    embed = discord.Embed(title="Starting election", description=game.president.display_name + 
-                        " is president. Please nominate your chancellor candidate! Use -nominate <username>", 
+    embed = discord.Embed(title="Starting election", description=game.president.display_name +
+                        " is president. Please nominate your chancellor candidate! Use -nominate <username>",
                         color=discord.Color.dark_red())
     embed.set_thumbnail(url=client.get_user(game.president.player_id).avatar_url)
     game.start_nomination()
@@ -989,10 +1027,11 @@ async def printHelp(channel):
     await channel.send(embed=embed)
 
 
-load_dotenv()
-token = os.getenv("SECRET_HITLER_DISCORD_TOKEN")
+def startApp():
+    load_dotenv()
+    token = os.getenv("SECRET_HITLER_DISCORD_TOKEN")
 
-if token is None:
-    raise RuntimeError("SECRET_HITLER_DISCORD_TOKEN environment variable not set")
+    if token is None:
+        raise RuntimeError("SECRET_HITLER_DISCORD_TOKEN environment variable not set")
 
-client.run(token)
+    client.run(token)
