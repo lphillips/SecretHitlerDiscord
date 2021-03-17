@@ -1,2 +1,5 @@
+import secret_hitler.app as app
+
+
 if __name__ == "__main__":
-    import secret_hitler.app
+    app.start_app()
