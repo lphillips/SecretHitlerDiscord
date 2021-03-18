@@ -420,6 +420,12 @@ async def nominate(ctx, member : commands.MemberConverter):
     await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
 
 
+@nominate.error
+async def nominate_error(ctx, error):
+    # Print the error message so the user knows why their nomination failed
+    await ctx.send(str(error))
+
+
 @client.command(name='discard')
 async def discard(ctx, card):
     game = get_game_with_player(ctx.message.author.id)
@@ -563,6 +569,12 @@ async def investigate(ctx, user : commands.UserConverter):
     game.set_president()
 
     await start_nomination(game)
+
+
+@investigate.error
+async def investigate_error(ctx, error):
+    # Print the error message so the user knows why their investigate failed
+    await ctx.send(str(error))
 
 
 @client.command(name='veto')
@@ -716,6 +728,12 @@ async def execute(ctx, user : commands.UserConverter):
         game.state = GameStates.NOMINATION
         game.set_president()
         await start_nomination(game)
+
+
+@execute.error
+async def execute_error(ctx, error):
+    # Print the error message so the user knows why their execute failed
+    await ctx.send(str(error))
 
 
 @client.command(name='restart')
@@ -1021,14 +1039,15 @@ async def printHelp(channel):
     embed.add_field(name="-license", value="Shows information about the license of this bot and SecretHitler", inline=False)
     embed.add_field(name="-startgame <public/private> <players>", value="Starts a public or private game.", inline=False)
     embed.add_field(name="-stopgame <id>", value="Stops the game with the given id", inline=False)
-    embed.add_field(name="-invite <username>", value="Invites a player to a private game", inline=False)
+    embed.add_field(name="-invite @<username>>", value="Invites a player to a private game", inline=False)
     embed.add_field(name="-veto", value="Veto the current agenda", inline=False)
     embed.add_field(name="-accept", value="Accept the current veto", inline=False)
     embed.add_field(name="-decline", value="Decline the current veto", inline=False)
     embed.add_field(name="-restart", value="Restarts a game", inline=False)
-    embed.add_field(name="-investigate <playername>", value="Investigates a players party", inline=False)
+    embed.add_field(name="-nominate @<username>", value="Nominate player to be chancellor")
+    embed.add_field(name="-investigate @<username>", value="Investigates a players party", inline=False)
     embed.add_field(name="-discard <l/f>", value="Discards a fascist or a liberal policy", inline=False)
-    embed.add_field(name="-execute <playername>", value="Executes a player", inline=False)
+    embed.add_field(name="-execute @<username>", value="Executes a player", inline=False)
     embed.add_field(name="-setup", value="Creates a Secret Hitler section in the discord and configures it for running games", inline=False)
     embed.set_footer(text="Please note that some commands are only available during a special event in a game")
     await channel.send(embed=embed)
