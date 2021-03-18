@@ -1,4 +1,5 @@
 import os
+import sys
 import discord
 import logging
 import asyncio
@@ -13,7 +14,7 @@ class DiscordChannelHandler(logging.Handler):
         logging.Handler.__init__(self)
         self._channel = channel
 
-    def setChannel(self, channel=None):
+    def set_channel(self, channel=None):
         self._channel = channel
 
     def emit(self, record):
@@ -80,6 +81,7 @@ async def on_ready():
 async def on_guild_available(guild):
     await setup(guild)
 
+
 @client.event
 async def on_member_update(before, after):
     game = get_game_with_player(before.id)
@@ -88,7 +90,6 @@ async def on_member_update(before, after):
         player.id = after.id
         player.display_name = after.display_name
         player.avatar_url = after.avatar_url
-
 
 
 @client.event
@@ -318,7 +319,7 @@ async def runtest(ctx, data : str):
 
 
 @client.command(name='invite')
-async def invite(ctx, member : commands.MemberConverter):
+async def invite(ctx, member: commands.MemberConverter):
     game = get_game_with_player(ctx.message.author.id)
     if game is None:
         await ctx.send("You can't invite someone because you are not in a game")
@@ -329,7 +330,7 @@ async def invite(ctx, member : commands.MemberConverter):
         await ctx.send("You can't invite this player because he already joined a game!")
         return
 
-    role = discord.utils.get(ctx.guild.roles, name='game_' + str(game.get_id()) + '_member')
+    role = discord.utils.get(ctx.guild.roles, name="game_" + str(game.get_id()) + "_member")
     if not game.add_player(member.id, member.display_name, member.avatar_url):
         await ctx.send("This game is already full")
         return
@@ -345,39 +346,45 @@ async def invite(ctx, member : commands.MemberConverter):
         await sendBoard(game)
         await start_nomination(game)
     else:
-        embed = discord.Embed(title='Player joined the game', description='The player '+member.display_name+' joined the game! Waiting for more players', color=discord.Color.dark_red())
+        embed = discord.Embed(title="Player joined the game", description="The player "+member.display_name+" joined the game! Waiting for more players", color=discord.Color.dark_red())
         embed.add_field(name="Slots", value=str(len(game.players))+"/"+str(game.max_players))
         await client.get_channel(game.channel_id).send(embed=embed)
 
 
+@invite.error
+async def invite_error(ctx, error):
+    # Print the error message so the user knows why their invite failed
+    await ctx.send(str(error))
+
+
 @client.command(name='stopgame')
-async def stop_game(ctx, id : int):
+async def stop_game(ctx, game_id: int):
     user = ctx.message.author
-    if discord.utils.get(user.roles, name='game_'+str(id)+'_administrator') is None:
+    if discord.utils.get(user.roles, name='game_'+str(game_id)+'_administrator') is None:
         await ctx.send("You don't have the permission to stop this game")
         return
 
-    game = running_games[id]
+    game = running_games[game_id]
     if not game:
         await ctx.send("This game does not exist")
         return
     guild = ctx.guild
-    role = discord.utils.get(guild.roles, name='game_'+str(id)+'_administrator')
+    role = discord.utils.get(guild.roles, name='game_'+str(game_id)+'_administrator')
     if role:
         await role.delete()
 
-    member_role = discord.utils.get(guild.roles, name='game_' + str(id) + '_member')
+    member_role = discord.utils.get(guild.roles, name='game_' + str(game_id) + '_member')
     if role:
         await member_role.delete()
     channel = client.get_channel(game.channel_id)
     if channel:
         await channel.delete()
-    voice = discord.utils.get(guild.voice_channels, name='game_'+str(id))
+    voice = discord.utils.get(guild.voice_channels, name='game_'+str(game_id))
     if voice:
         await voice.delete()
 
-    running_games.pop(id)
-    await ctx.send("The Game with the id: "+str(id)+" has been deleted")
+    running_games.pop(game_id)
+    await ctx.send("The Game with the id: "+str(game_id)+" has been deleted")
 
 
 @client.command(name='nominate')
@@ -758,7 +765,7 @@ async def start_president_legislative(game : Game):
 
 async def cleanup(guild):
     # Removes everything created by the setup function
-    channelHandler.setChannel(None)
+    channelHandler.set_channel(None)
     category = get_category(guild)
     if category is not None:
         for c in category.channels:
@@ -893,7 +900,7 @@ async def init_channel_logs(channel):
             channel.guild.default_role: discord.PermissionOverwrite(send_messages=False),
             channel.guild.me: discord.PermissionOverwrite(send_messages=True)
             })
-    channelHandler.setChannel(channel)
+    channelHandler.set_channel(channel)
 
 
 async def init_channel_lobby(channel):
@@ -1027,7 +1034,7 @@ async def printHelp(channel):
     await channel.send(embed=embed)
 
 
-def startApp():
+def start_app():
     load_dotenv()
     token = os.getenv("SECRET_HITLER_DISCORD_TOKEN")
 
