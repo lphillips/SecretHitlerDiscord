@@ -84,10 +84,11 @@ async def on_guild_available(guild):
 
 @client.event
 async def on_member_update(before, after):
+    # TODO: This needs review based on the type of the parameters
     game = get_game_with_player(before.id)
     if game is not None:
         player = game.get_player(before.id)
-        player.id = after.id
+        player.player_id = after.id
         player.display_name = after.display_name
         player.avatar_url = after.avatar_url
 
@@ -314,6 +315,19 @@ async def start_game(ctx, mode, players: int):
         await message.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
 
 
+@start_game.error
+async def start_game_error(ctx, error):
+    if isinstance(error, commands.BadArgument):
+        await ctx.send("Use a number between 5 and 10 when starting a game. Example: *-startgame private 7*")
+    elif isinstance(error, commands.MissingRequiredArgument) or isinstance(error, commands.TooManyArguments):
+        await ctx.send("-startgame needs to know if this is a private or public game, and how many players are playing."
+                       " Example: *-startgame private 7*")
+    else:
+        await ctx.send(str(error))
+
+
+# Print the error message so the use
+
 @client.command(name='runtest')
 async def runtest(ctx, _):
     # generic command to use to test api calls without having to restart the server over and over
@@ -367,7 +381,7 @@ async def invite(ctx, member: commands.MemberConverter):
     else:
         embed = discord.Embed(
             title="Player joined the game",
-            description="The player " + member.display_name + "joined the game! Waiting for more players",
+            description="The player " + member.display_name + " joined the game! Waiting for more players",
             color=discord.Color.dark_red()
         )
         embed.add_field(name="Slots", value=str(len(game.players)) + "/" + str(game.max_players))
@@ -431,7 +445,7 @@ async def nominate(ctx, member: commands.MemberConverter):
         await ctx.message.delete()
         return
 
-    if not game.nominate(player.id):
+    if not game.nominate(player.player_id):
         await ctx.send("This player could not be nominated. He was chancellor or president in the last round")
         return
 
@@ -937,6 +951,7 @@ async def setup(guild):
 
 
 def verify_permissions(guild):
+    # TODO: Add 'manage_messages' and 'add_reactions'
     required_permissions = discord.Permissions(
         manage_roles=True,
         manage_emojis=True,
@@ -1004,8 +1019,8 @@ async def init_channel_lobby(channel):
 async def start_nomination(game: Game):
     embed = discord.Embed(
         title="Starting election",
-        description=game.president.display_name + "is president. Please nominate your chancellor candidate! Use "
-                                                  "-nominate <username>",
+        description=game.president.display_name + " is president. Please nominate your chancellor candidate!\nUse "
+                                                  "`-nominate <username>`",
         color=discord.Color.dark_red()
     )
     embed.set_thumbnail(url=client.get_user(game.president.player_id).avatar_url)
@@ -1171,19 +1186,31 @@ async def print_help(channel):
     )
     embed.add_field(
         name="-startgame <public/private> <players>",
-        value="Starts a public or private game.",
+        value="Starts a public or private game. Example: `-startgame private 5` to start a game for 5 players",
         inline=False
     )
-    embed.add_field(name="-stopgame <id>", value="Stops the game with the given id", inline=False)
-    embed.add_field(name="-invite @<username>>", value="Invites a player to a private game", inline=False)
+    embed.add_field(
+        name="-stopgame <id>",
+        value="Stops the game with the given id. For example, to stop game_3, type `-stopgame 3`", inline=False
+    )
+    embed.add_field(
+        name="-invite @<username>", value="Invites a player to a private game. Example: `-invite @john_doe`",
+        inline=False
+    )
     embed.add_field(name="-veto", value="Veto the current agenda", inline=False)
     embed.add_field(name="-accept", value="Accept the current veto", inline=False)
     embed.add_field(name="-decline", value="Decline the current veto", inline=False)
     embed.add_field(name="-restart", value="Restarts a game", inline=False)
-    embed.add_field(name="-nominate @<username>", value="Nominate player to be chancellor")
-    embed.add_field(name="-investigate @<username>", value="Investigates a players party", inline=False)
-    embed.add_field(name="-discard <l/f>", value="Discards a fascist or a liberal policy", inline=False)
-    embed.add_field(name="-execute @<username>", value="Executes a player", inline=False)
+    embed.add_field(name="-nominate @<username>", value="Nominate player to be chancellor. Example: `-invite @john_doe`")
+    embed.add_field(
+        name="-investigate @<username>",
+        value="Investigates a players party. Example: `-investigate @john_doe`", inline=False
+    )
+    embed.add_field(
+        name="-discard <l/f>", value="Discards a fascist or a liberal policy. Example: `-discard l`",
+        inline=False
+    )
+    embed.add_field(name="-execute @<username>", value="Executes a player. Example: `-execute @john_doe`", inline=False)
     embed.add_field(
         name="-setup",
         value="Creates a Secret Hitler section in the discord and configures it for running games",
