@@ -1,11 +1,11 @@
 import unittest
-from unittest.mock import Mock, MagicMock, patch, create_autospec
+from unittest.mock import Mock, MagicMock, patch, call
 from secret_hitler import game, images
 
 
 class GameInitTestCase(unittest.TestCase):
     def setUp(self) -> None:
-        self.game = game.Game(0, 0, 10, 0)
+        self.game = game.Game(MagicMock(), 0, 0, 10, 0)
 
     def test_game_init(self):
         """Test deck composition of liberal and fascist policies"""
@@ -13,6 +13,74 @@ class GameInitTestCase(unittest.TestCase):
         fascist_count = sum(map(lambda c: c == 'F', self.game.deck))
         self.assertEqual(6, liberal_count)
         self.assertEqual(11, fascist_count)
+
+
+class GameStartTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.game = game.Game(MagicMock(), 0, 0, 5, 0)
+        add_players(self.game, 5)
+
+    @patch("random.shuffle")
+    def test_game_start(self, mock_shuffle):
+        # Note: This test asserts players are shuffled before roles.
+        # This isn't actually a requirement of game_start, just a
+        # side-effect of how the test is written
+        self.game.start_game()
+        roles = ["Liberal", "Liberal", "Liberal", "Fascist", "Hitler"]
+        shuffle_calls = [call.attribute.method(self.game.players), call.attribute.method(roles)]
+        self.assertEqual(mock_shuffle.mock_calls, shuffle_calls)
+        player_roles = map(lambda p: p.role, self.game.players)
+        self.assertTrue(None not in player_roles)
+
+
+class GameNominateTestCase(unittest.TestCase):
+    def setUp(self) -> None:
+        self.game = game.Game(MagicMock(), 0, 0, 5, 0)
+        add_players(self.game, 5)
+        self.game.president = self.game.players[0]
+        self.game.president_id = 0
+        self.game.state = game.GameState.NOMINATION
+
+    def test_nominate_eligible(self):
+        result = self.game.nominate("test_player_2")
+        self.assertTrue(result)
+        self.assertEqual(game.GameState.ELECTION, self.game.state)
+
+    def test_nominate_self(self):
+        result = self.game.nominate("test_player_1")
+        self.assertFalse(result)
+        self.assertEqual(game.GameState.NOMINATION, self.game.state)
+
+    def test_nominate_prev_chancellor(self):
+        # The "previous chancellor" is still set as the current
+        # chancellor during nomination. A successful election is
+        # what unseats a chancellor.
+        self.game.chancellor = self.game.players[1]
+        self.game.chancellor_id = "test_player_2"
+        result = self.game.nominate("test_player_2")
+        self.assertFalse(result)
+        self.assertEqual(game.GameState.NOMINATION, self.game.state)
+
+    def test_nominate_prev_president_five_players(self):
+        self.game.prev_president = self.game.players[1]
+        self.game.prev_president_id = "test_player_2"
+        result = self.game.nominate("test_player_2")
+        self.assertTrue(result)
+        self.assertEqual(game.GameState.ELECTION, self.game.state)
+
+    def test_nominate_prev_president_six_players(self):
+        # Override the default set up
+        self.game = game.Game(MagicMock(), 0, 0, 6, 0)
+        add_players(self.game, 6)
+        self.game.president = self.game.players[0]
+        self.game.president_id = 0
+        self.game.state = game.GameState.NOMINATION
+
+        self.game.prev_president = self.game.players[1]
+        self.game.prev_president_id = "test_player_2"
+        result = self.game.nominate("test_player_2")
+        self.assertFalse(result)
+        self.assertEqual(game.GameState.NOMINATION, self.game.state)
 
 
 class GameVoteFivePlayersTestCase(unittest.TestCase):

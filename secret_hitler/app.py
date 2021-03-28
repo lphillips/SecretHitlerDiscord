@@ -4,7 +4,7 @@ import logging
 import asyncio
 from dotenv import load_dotenv
 from discord.ext import commands
-from secret_hitler.game import Game, GameState, VoteResult
+from secret_hitler.game import Game, Player, GameState, VoteResult
 from secret_hitler import config
 
 
@@ -29,6 +29,57 @@ class DiscordChannelHandler(logging.Handler):
                 asyncio.create_task(self._channel.send(msg))
             except Exception:
                 self.handleError(record)
+
+
+class GameStateObserver:
+
+    @staticmethod
+    def on_enter_game_start(game, ctx):
+        asyncio.create_task(send_game_start_message(game))
+
+    @staticmethod
+    def on_enter_nomination(game, ctx):
+        asyncio.create_task(send_nomination_message(game))
+
+    @staticmethod
+    def on_enter_election(game, nominated_player, ctx):
+        asyncio.create_task(send_election_message(game, nominated_player, ctx))
+
+    @staticmethod
+    def on_enter_legislative_president(game, ctx):
+        asyncio.create_task(send_legislative_presidential_message(game))
+
+    @staticmethod
+    def on_enter_legislative_chancellor(game, ctx):
+        pass
+
+    @staticmethod
+    def on_government_in_chaos(game, ctx):
+        asyncio.create_task(send_government_in_chaos_message(game))
+
+    @staticmethod
+    def on_enter_veto(game, ctx):
+        pass
+
+    @staticmethod
+    def on_enter_investigation(game, ctx):
+        pass
+
+    @staticmethod
+    def on_enter_special_election(game, ctx):
+        pass
+
+    @staticmethod
+    def on_enter_policy_peek(game, ctx):
+        asyncio.create_task(send_policy_peek_message(game))
+
+    @staticmethod
+    def on_enter_execution(game):
+        pass
+
+    @staticmethod
+    def on_enter_game_over(game):
+        asyncio.create_task(send_game_over_message(game))
 
 
 discordFormatter = logging.Formatter("[%(asctime)s][%(levelname)s][%(name)s] %(message)s")
@@ -108,164 +159,9 @@ async def on_reaction_add(reaction, user):
         vote = emoji_to_vote(emoji)
         vote_result = game.vote(user.id, vote)
 
-        if vote_result is VoteResult.INVALID:
+        if vote_result == VoteResult.INVALID:
             await reaction.remove(user)
             return
-        elif vote_result is VoteResult.CHANCELLOR_ELECTED:
-            # if game.state is GameState.GAME_OVER:
-            #     # Secret Hitler was elected chancellor in the late game
-            #     embed = discord.Embed(
-            #         title="Game over!",
-            #         description=game.winner + "s won the game. Use -restart to restart the game",
-            #         color=discord.Color.dark_red()
-            #     )
-            #     for player in game.players:
-            #         embed.add_field(name=client.get_user(player.player_id), value=player.role, inline=False)
-            #     await client.get_channel(game.channel_id).send(embed=embed)
-            # else:
-            #     # The chancellor was successfully elected; time for policies
-            #     embed = discord.Embed(
-            #         title="New Chancellor",
-            #         description=game.chancellor.display_name + " is the new chancellor. Legislative Session starts now",
-            #         color=discord.Color.dark_red()
-            #     )
-            #     embed.set_thumbnail(url=game.chancellor.avatar_url)
-            #     await client.get_channel(game.channel_id).send(embed=embed)
-            # return
-        elif vote_result is VoteResult.CHANCELLOR_REJECTED:
-            if game.state is GameState.NOMINATION:
-                # Vote failed so a new president must nominate a chancellor
-                embed = discord.Embed(
-                    title="Election Failed three times in a row",
-                    description="The election failed three times in a row. The top policy will be revealed",
-                    color=discord.Color.dark_red()
-                )
-                await client.get_channel(game.channel_id).send(embed=embed)
-                await send_board(game)
-            elif game.state == GameState.POLICY_PEEK:
-                file = discord.File("secret_hitler/img/policypeek_" + str(game.game_id) + ".png",
-                                    filename="president.png")
-                embed = discord.Embed(
-                    title="Policy Peek",
-                    description="These are the next three policies.",
-                    color=discord.Color.dark_red()
-                )
-                embed.set_image(url="attachment://president.png")
-                await client.get_user(game.president.player_id).send(embed=embed, file=file)
-                embed = discord.Embed(
-                    title="Policy Peek",
-                    description="The current president sees the top three policies. Please check your Direct Message!",
-                    color=discord.Color.dark_red()
-                )
-                await client.get_channel(game.channel_id).send(embed=embed)
-                return
-            elif game.state == GameState.INVESTIGATION:
-                embed = discord.Embed(
-                    title="Investigation",
-                    description="The current president can now investigate a player's party. "
-                                "Please use `-investigate @<username>` to do that",
-                    color=discord.Color.dark_red()
-                )
-                await client.get_channel(game.channel_id).send(embed=embed)
-                return
-            elif game.state == GameState.EXECUTION:
-                embed = discord.Embed(
-                    title="Execution",
-                    description="The current president can execute a player. Please use `-execute @<username>`",
-                    color=discord.Color.dark_red()
-                )
-                await client.get_channel(game.channel_id).send(embed=embed)
-                return
-
-
-
-        # if len(game.votes) == len(game.players):
-        #     if game.calculate_votes():
-        #         # Start Legislative Session
-        #         embed = discord.Embed(
-        #             title="New Chancellor",
-        #             description=game.chancellor.display_name + " is the new chancellor. Legislative Session starts now",
-        #             color=discord.Color.dark_red()
-        #         )
-        #         embed.set_thumbnail(url=game.chancellor.avatar_url)
-        #         await client.get_channel(game.channel_id).send(embed=embed)
-        #         await start_president_legislative(game)
-        #         return
-        #
-        #     if game.state == GameState.GAME_OVER:
-        #         embed = discord.Embed(title='Game over!',
-        #                               description=game.winner + 's won the game. Use -restart to restart the game',
-        #                               color=discord.Color.dark_red())
-        #         for player in game.players:
-        #             embed.add_field(name=client.get_user(player.player_id), value=player.role, inline=False)
-        #         await client.get_channel(game.channel_id).send(embed=embed)
-        #         return
-        #
-        #     if game.failed_votes > 3:
-        #         embed = discord.Embed(title="Election Failed three times in a row",
-        #                               description="The election failed three times in a row. The top policy will be "
-        #                                           "revealed",
-        #                               color=discord.Color.dark_red())
-        #         await client.get_channel(game.channel_id).send(embed=embed)
-        #         await send_board(game)
-        #         game.failed_votes = 0
-        #         if game.state == GameState.NOMINATION:
-        #             game.set_presidnet()
-        #             game.nominated = None
-        #             await start_nomination(game)
-        #             return
-        #
-        #         if game.state == GameState.GAME_OVER:
-        #             embed = discord.Embed(title='Game over!',
-        #                                   description=game.winner + 's won the game. Use -restart to restart the game.',
-        #                                   color=discord.Color.dark_red())
-        #             for player in game.players:
-        #                 embed.add_field(name=client.get_user(player.player_id), value=player.role, inline=False)
-        #             await client.get_channel(game.channel_id).send(embed=embed)
-        #             return
-        #
-        #         if game.state == GameState.INVESTIGATION:
-        #             embed = discord.Embed(title='Investigation',
-        #                                   description='The current president can now investigate a players party. '
-        #                                               'Please use -investigate <playername> to do that',
-        #                                   color=discord.Color.dark_red())
-        #             await client.get_channel(game.channel_id).send(embed=embed)
-        #             return
-        #
-        #         if game.state == GameState.POLICY_PEEK:
-        #             game.policy_peek()
-        #             file = discord.File('secret_hitler/img/policypeek_' + str(game.game_id) + '.png',
-        #                                 filename='president.png')
-        #             embed = discord.Embed(title="Policy Peek",
-        #                                   description="These are the next three policies.",
-        #                                   color=discord.Color.dark_red())
-        #             embed.set_image(url="attachment://president.png")
-        #             await client.get_user(game.president.player_id).send(embed=embed, file=file)
-        #             embed = discord.Embed(title='Policy Peek',
-        #                                   description="The current president sees the top three policies. Please "
-        #                                               "check your Direct Message!",
-        #                                   color=discord.Color.dark_red())
-        #             await client.get_channel(game.channel_id).send(embed=embed)
-        #             game.set_president()
-        #             game.state = GameState.NOMINATION
-        #             await start_nomination(game)
-        #             return
-        #
-        #         if game.state == GameState.EXECUTION:
-        #             embed = discord.Embed(title="Execution",
-        #                                   description="The current president can execute a player. Please use "
-        #                                               "-execute <playername>",
-        #                                   color=discord.Color.dark_red())
-        #             await client.get_channel(game.channel_id).send(embed=embed)
-        #             return
-        #     else:
-        #         embed = discord.Embed(title="Election Failed",
-        #                               description="The vote failed. After 3 failed votes the top policy will be "
-        #                                           "revealed",
-        #                               color=discord.Color.dark_red())
-        #         embed.add_field(name="Failed Votes", value=str(game.failed_votes) + "/3")
-        #     await client.get_channel(game.channel_id).send(embed=embed)
-        #     await start_nomination(game)
 
 
 # Commands
@@ -359,11 +255,11 @@ async def start_game(ctx, mode, players: int):
     channel = await ctx.guild.create_text_channel(name='game_' + str(game_id), category=category, overwrites=overwrites)
     await ctx.guild.create_voice_channel(name='game_' + str(game_id), category=category, overwrites=channel_overwrites)
 
-    running_games[game_id] = Game(channel.id, game_id, players, ctx.message.author.id)
+    running_games[game_id] = Game(GameStateObserver(), channel.id, game_id, players, ctx.message.author.id)
     running_games[game_id].add_player(ctx.message.author.id, ctx.message.author.display_name,
                                       ctx.message.author.avatar_url)
 
-    embed = discord.Embed(title='Starting SecretHitler...', description='Waiting for other players')
+    embed = discord.Embed(title='Starting Secret Hitler...', description='Waiting for other players')
     embed.add_field(name='Slots', value='1/' + str(players))
     if mode.lower() == 'private':
         embed.add_field(name='Private Game',
@@ -383,7 +279,7 @@ async def start_game(ctx, mode, players: int):
 @start_game.error
 async def start_game_error(ctx, error):
     if isinstance(error, commands.BadArgument):
-        await ctx.send("Use a number between 5 and 10 when starting a game. Example: *-startgame private 7*")
+        await ctx.send("Use a number between 5 and 10 when starting a game. Example: `-startgame private 7`")
     elif isinstance(error, commands.MissingRequiredArgument) or isinstance(error, commands.TooManyArguments):
         await ctx.send("-startgame needs to know if this is a private or public game, and how many players are playing."
                        " Example: *-startgame private 7*")
@@ -428,10 +324,13 @@ async def invite(ctx, member: commands.MemberConverter):
     if not game.add_player(member.id, member.display_name, member.avatar_url):
         await ctx.send("This game is already full")
         return
+
     await member.add_roles(role)
-    embed = discord.Embed(title="Secret Hitler",
-                          description="You have been added to a Secret Hitler game. The round will start as soon "
-                                      "enough players have joined")
+    embed = discord.Embed(
+        title="Secret Hitler",
+        description="You have been added to a Secret Hitler game. The round will start as soon "
+                    "enough players have joined"
+    )
     embed.add_field(
         name="Game channel",
         value="Visit the channel #game_" + str(game.get_id()) + ". The game will be processed in there. You will "
@@ -439,13 +338,7 @@ async def invite(ctx, member: commands.MemberConverter):
     )
     await member.send(embed=embed)
 
-    if game.start_game():
-        await client.get_channel(game.channel_id).send("All players joined the game. Let's get it started. Ha.")
-        await send_players_info(game)
-        await send_roles(game)
-        await send_board(game)
-        await start_nomination(game)
-    else:
+    if not game.start_game():
         embed = discord.Embed(
             title="Player joined the game",
             description="The player " + member.display_name + " joined the game! Waiting for more players",
@@ -517,13 +410,15 @@ async def nominate(ctx, member: commands.MemberConverter):
         return
 
     await ctx.message.delete()
-    embed = discord.Embed(title='Player ' + player.display_name + ' was nominated for chancellor',
-                          description="Please react to this message with Ja or Nein to vote",
-                          color=discord.Color.dark_red())
-    embed.set_thumbnail(url=player.avatar_url)
-    msg = await client.get_channel(game.channel_id).send(embed=embed)
-    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
-    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
+    # embed = discord.Embed(
+    #     title='Player ' + player.display_name + ' was nominated for chancellor',
+    #     description="Please react to this message with Ja or Nein to vote",
+    #     color=discord.Color.dark_red()
+    # )
+    # embed.set_thumbnail(url=player.avatar_url)
+    # msg = await client.get_channel(game.channel_id).send(embed=embed)
+    # await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
+    # await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
 
 
 @nominate.error
@@ -1033,7 +928,7 @@ def verify_permissions(guild):
     if not guild.me.guild_permissions.manage_channels:
         logger.error("Bot is missing 'manage_channels' permission")
     if not guild.me.guild_permissions.send_messages:
-        logger.error("Bot is missing'send_messages' permission")
+        logger.error("Bot is missing 'send_messages' permission")
 
     return guild.me.guild_permissions.is_superset(required_permissions)
 
@@ -1122,7 +1017,7 @@ async def send_players_info(game: Game):
 
 
 async def send_board(game: Game):
-    game.printBoard()
+    game.print_board()
     liberal = discord.File(game.return_path_to_liberal_board())
     fascist = discord.File(game.return_path_to_fascist_board())
     await client.get_channel(game.channel_id).send(file=liberal)
@@ -1297,24 +1192,41 @@ def emoji_to_vote(emoji: discord.Emoji) -> str:
 
 
 # ============================================
-# Game state observation
+# App start up
 # ============================================
 
 
-def on_game_start(game):
-    pass
+async def send_game_start_message(game: Game):
+    await client.get_channel(game.channel_id).send("All players joined the game. Let's get it started.")
+    await send_players_info(game)
+    await send_roles(game)
+    await send_board(game)
 
 
-def on_nomination(game):
-    pass
+async def send_nomination_message(game: Game):
+    embed = discord.Embed(
+        title="Starting election",
+        description=game.president.display_name + " is president. Please nominate your chancellor candidate!\nUse "
+                                                  "`-nominate <username>`",
+        color=discord.Color.dark_red()
+    )
+    embed.set_thumbnail(url=client.get_user(game.president.player_id).avatar_url)
+    await client.get_channel(game.channel_id).send(embed=embed)
 
 
-def on_election(game):
-    pass
+async def send_election_message(game: Game, nominated_player: Player, ctx):
+    embed = discord.Embed(
+        title='Player ' + nominated_player.display_name + ' was nominated for chancellor',
+        description="Please react to this message with Ja or Nein to vote",
+        color=discord.Color.dark_red()
+    )
+    embed.set_thumbnail(url=nominated_player.avatar_url)
+    msg = await client.get_channel(game.channel_id).send(embed=embed)
+    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
+    await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
 
 
-def on_legislative_president(game):
-    # The chancellor was successfully elected; time for policies
+async def send_legislative_presidential_message(game: Game):
     embed = discord.Embed(
         title="New Chancellor",
         description=game.chancellor.display_name + " is the new chancellor. Legislative Session starts now",
@@ -1324,23 +1236,17 @@ def on_legislative_president(game):
     await client.get_channel(game.channel_id).send(embed=embed)
 
 
-def on_legislative_chancellor(game):
-    pass
+async def send_government_in_chaos_message(game: Game):
+    embed = discord.Embed(
+        title="Election Failed three times in a row",
+        description="The election failed three times in a row. The top policy will be revealed.",
+        color=discord.Color.dark_red()
+    )
+    await client.get_channel(game.channel_id).send(embed=embed)
+    await send_board(game)
 
 
-def on_veto(game):
-    pass
-
-
-def on_investigation(game):
-    pass
-
-
-def on_special_election(game):
-    pass
-
-
-def on_policy_peek(game):
+async def send_policy_peek_message(game: Game):
     file = discord.File(
         "secret_hitler/img/policypeek_" + str(game.game_id) + ".png",
         filename="president.png"
@@ -1360,11 +1266,26 @@ def on_policy_peek(game):
     await client.get_channel(game.channel_id).send(embed=embed)
 
 
-def on_execution(game):
-    pass
+async def send_investigation_message(game: Game):
+    embed = discord.Embed(
+        title="Investigation",
+        description="The current president can now investigate a player's party. "
+                    "Please use `-investigate @<username>` to do that",
+        color=discord.Color.dark_red()
+    )
+    await client.get_channel(game.channel_id).send(embed=embed)
 
 
-def on_game_over(game):
+async def send_execution_message(game: Game):
+    embed = discord.Embed(
+        title="Execution",
+        description="The current president can execute a player. Please use `-execute @<username>`",
+        color=discord.Color.dark_red()
+    )
+    await client.get_channel(game.channel_id).send(embed=embed)
+
+
+async def send_game_over_message(game: Game):
     embed = discord.Embed(
         title="Game over!",
         description=game.winner + "s won the game. Use -restart to restart the game",

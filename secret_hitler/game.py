@@ -4,6 +4,10 @@ from PIL import Image
 from secret_hitler import config, images
 
 
+class IllegalStateTransition(Exception):
+    pass
+
+
 class VoteResult(Enum):
     CHANCELLOR_ELECTED = 1
     CHANCELLOR_REJECTED = 2
@@ -66,41 +70,64 @@ class Game:
         self.state = GameState.GAME_STARTING
         self.votes = {}
 
-    def __transition_to_state(self, next_state):
+    def __transition_to_state(self, next_state, ctx=None):
         self.state = next_state
         if self.state == GameState.GAME_STARTING:
             self.__start_game()
-            self.observer.on_game_start()
+            self.observer.on_enter_game_start(self, ctx)
+
+            # GAME_STARTING is the start state where we do set up.
+            # Set up is done and the observer has been notified, so
+            # enter the first actual game state.
+            self.__transition_to_state(GameState.NOMINATION)
         elif self.state == GameState.NOMINATION:
-            self.observer.on_nomination()
+            self.observer.on_enter_nomination(self, ctx)
         elif self.state == GameState.ELECTION:
-            self.observer.on_election()
+            self.observer.on_enter_election(self, self.nominated, ctx)
         elif self.state == GameState.LEGISLATIVE_PRESIDENT:
-            self.__president_legislative()
-            self.observer.on_legislative_president()
+            self.__president_legislative(self, ctx)
+            self.observer.on_enter_legislative_president(self)
         elif self.state == GameState.LEGISLATIVE_CHANCELLOR:
-            self.chancellor_legislative()
-            self.observer.on_legislative_chancellor()
+            self.__chancellor_legislative(self, ctx)
+            self.observer.on_enter_legislative_chancellor(self)
         elif self.state == GameState.VETO:
             # TODO: Determine what should happen here
-            self.observer.on_veto()
+            self.observer.on_enter_veto(self, ctx)
         elif self.state == GameState.INVESTIGATION:
             # TODO: Determine what should happen here
-            self.observer.on_investigation()
+            self.observer.on_enter_investigation(self, ctx)
         elif self.state == GameState.SPECIAL_ELECTION:
             # TODO: Determine what should happen here
-            self.observer.on_special_election()
+            self.observer.on_enter_special_election(self, ctx)
         elif self.state == GameState.POLICY_PEEK:
-            self.policy_peek()
-            self.observer.on_policy_peek()
+            self.__policy_peek()
+            self.observer.on_enter_policy_peek(self, ctx)
         elif self.state == GameState.EXECUTION:
             # TODO: Determine what should happen here
-            self.observer.on_execution()
+            self.observer.on_enter_execution(self, ctx)
         elif self.state == GameState.GAME_OVER:
             # TODO: Determine what should happen here
-            self.observer.on_game_over()
+            self.observer.on_enter_game_over(self, ctx)
         else:
             raise ValueError("Unknown GameState encountered")
+
+    def __is_player_president(self, player_id) -> bool:
+        return self.president.get_id() == player_id
+
+    def __is_player_chancellor(self, player_id) -> bool:
+        if self.chancellor is None:
+            return False
+
+        return self.chancellor.player_id == player_id
+
+    def __is_player_previous_president(self, player_id) -> bool:
+        return self.prev_president.get_id() == player_id
+
+    def __is_player_previous_chancellor(self, player_id) -> bool:
+        if self.prev_chancellor is None:
+            return False
+
+        return self.prev_chancellor.player_id == player_id
 
     def add_player(self, player_id, display_name, avatar_url):
         if len(self.players) == self.max_players:
@@ -128,23 +155,33 @@ class Game:
 
         self.president = self.players[0]
 
-    def nominate(self, player_id):
+    def nominate(self, player_id, ctx=None):
         player = self.get_player(player_id)
+        if self.__is_player_eligible_for_nomination(player_id):
+            self.nominated = player
+            self.__transition_to_state(GameState.ELECTION, ctx=ctx)
+            return True
+        else:
+            return False
+
+    def __is_player_eligible_for_nomination(self, player_id: str) -> bool:
+        # Eligibility rules:
+        # 1. The last elected president and chancellor are ineligible to be chancellor.
+        # 2. If there are only five players left in the game, the last elected president
+        #    becomes eligible to be chancellor.
+        # 3. TODO: Veto power and the election tracker state can affect eligibility
+
         player_num = len(self.players)
         if player_num <= 5:
-            print(self.prev_chancellor_id)
-            print(player_id)
-            if self.chancellor is not None and self.chancellor.player_id is player_id:
+            if self.__is_player_chancellor(player_id):
                 return False
         elif player_num > 5:
-            if (
-                    self.chancellor is not None and self.chancellor.player_id is player_id) or self.prev_president_id is player_id:
+            if self.__is_player_chancellor(player_id) or self.__is_player_previous_president(player_id):
                 return False
 
-        if self.president is not None and self.president.player_id is player_id:
+        if self.__is_player_president(player_id):
             return False
-        self.nominated = player
-        self.__transition_to_state(GameState.ELECTION)
+        # All eligibility tests passed. This candidate is eligible.
         return True
 
     def vote(self, player_id: str, vote: str) -> VoteResult:
@@ -152,14 +189,14 @@ class Game:
             # TODO: We could raise an exception here and rely on the app module to ignore voting if no election is in process
             return VoteResult.NO_ELECTION
 
-        is_vote_valid = self.count_vote(player_id, vote)
+        is_vote_valid = self.__count_vote(player_id, vote)
 
         if not is_vote_valid:
             return VoteResult.INVALID
 
         # If all votes are in, process the result of the election
         if len(self.votes) == len(self.players):
-            if self.calculate_votes():
+            if self.__calculate_votes():
                 # Start Legislative Session
                 self.__transition_to_state(GameState.LEGISLATIVE_PRESIDENT)
                 return VoteResult.CHANCELLOR_ELECTED
@@ -184,7 +221,7 @@ class Game:
             # Intermediate vote counted; election not over
             return VoteResult.VALID
 
-    def count_vote(self, player_id, vote):
+    def __count_vote(self, player_id, vote):
         if self.get_player(player_id) is None:
             return False
 
@@ -198,7 +235,7 @@ class Game:
         self.votes[player_id] = vote
         return True
 
-    def calculate_votes(self):
+    def __calculate_votes(self):
         yes = 0
         no = 0
         for _, vote in self.votes.items():
@@ -339,9 +376,9 @@ class Game:
 
         policy_hand_image = images.PolicyHandImage(policy1, policy2, policy3)
         policy_hand_image.compose()
-        policy_hand_image.write("secret_hitler/img/president_"+str(self.game_id)+".png")
+        policy_hand_image.write("secret_hitler/img/president_" + str(self.game_id) + ".png")
 
-    def policy_peek(self):
+    def __policy_peek(self):
         policy1 = self.get_policy()
         policy2 = self.get_policy()
         policy3 = self.get_policy()
@@ -380,7 +417,7 @@ class Game:
         self.set_president()
         self.start_nomination()
 
-    def printBoard(self):
+    def print_board(self):
         img1 = Image.open('secret_hitler/img/liberal_policy.png')
 
         img_new = Image.open('secret_hitler/img/LiberalBoard.png')
@@ -401,7 +438,7 @@ class Game:
             img_new_2.paste(img2, config.configuration["fascist_board"][i])
         img_new_2.save("secret_hitler/img/fascist_" + str(self.game_id) + ".png")
 
-    def chancellor_legislative(self):
+    def __chancellor_legislative(self):
         policy1 = self.policies[0]
         policy2 = self.policies[1]
 
