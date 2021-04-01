@@ -410,15 +410,6 @@ async def nominate(ctx, member: commands.MemberConverter):
         return
 
     await ctx.message.delete()
-    # embed = discord.Embed(
-    #     title='Player ' + player.display_name + ' was nominated for chancellor',
-    #     description="Please react to this message with Ja or Nein to vote",
-    #     color=discord.Color.dark_red()
-    # )
-    # embed.set_thumbnail(url=player.avatar_url)
-    # msg = await client.get_channel(game.channel_id).send(embed=embed)
-    # await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=JA))
-    # await msg.add_reaction(discord.utils.get(ctx.guild.emojis, name=NEIN))
 
 
 @nominate.error
@@ -444,8 +435,8 @@ async def discard(ctx, card):
 
     if not game.discard_policy(ctx.message.author.id, card):
         await ctx.send(
-            "Policy can't be discarded. You either don't have the permission to do it or you cant discard this "
-            "policy. Use -discard <f/l> "
+            "Policy can't be discarded. You either don't have the permission to do it or you can't discard this "
+            "policy. Use `-discard <f/l>`. Example: to discard a fascist policy, use `-discard f`"
         )
         return
 
