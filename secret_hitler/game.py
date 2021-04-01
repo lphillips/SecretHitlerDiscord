@@ -247,11 +247,7 @@ class Game:
         if self.get_player(player_id) is None:
             return False
 
-        for pid, s_v in self.votes.items():
-            if pid == player_id:
-                return False
-
-        if len(self.votes) == len(self.players):
+        if player_id in self.votes:
             return False
 
         self.votes[player_id] = vote

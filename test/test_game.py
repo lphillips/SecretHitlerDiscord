@@ -545,7 +545,6 @@ class GameTestLiberalBoardStates(unittest.TestCase):
         self.game.add_player("test_player_4", "Player 4", "p4")
         self.game.add_player("test_player_5", "Player 5", "p5")
         self.game.deck = ["L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L", "L"]
-        # self.game._president_ = self.game.players["test_player_1"]
 
     @patch("secret_hitler.images.PolicyHandImage", MagicMock(spec=images.PolicyHandImage))
     @patch("random.shuffle", MagicMock())

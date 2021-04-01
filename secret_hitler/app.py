@@ -1188,7 +1188,7 @@ def emoji_to_vote(emoji: discord.Emoji) -> str:
 
 
 # ============================================
-# App start up
+# Game event messaging
 # ============================================
 
 
