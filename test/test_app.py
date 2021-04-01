@@ -41,7 +41,9 @@ class SetupAppTestCase(unittest.TestCase):
             manage_roles=True,
             manage_emojis=True,
             manage_channels=True,
-            send_messages=False
+            send_messages=False,
+            add_reactions=True,
+            manage_messages=True
         )
         self.mock_guild.me = Mock()
         self.mock_guild.me.guild_permissions = mock_permissions
@@ -54,7 +56,9 @@ class SetupAppTestCase(unittest.TestCase):
             manage_roles=True,
             manage_emojis=True,
             manage_channels=True,
-            send_messages=True
+            send_messages=True,
+            add_reactions=True,
+            manage_messages=True
         )
         self.mock_guild.me = Mock()
         self.mock_guild.me.guild_permissions = mock_permissions

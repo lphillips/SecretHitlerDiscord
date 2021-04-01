@@ -904,12 +904,13 @@ async def setup(guild):
 
 
 def verify_permissions(guild):
-    # TODO: Add 'manage_messages' and 'add_reactions'
     required_permissions = discord.Permissions(
         manage_roles=True,
         manage_emojis=True,
         manage_channels=True,
-        send_messages=True
+        send_messages=True,
+        add_reactions=True,
+        manage_messages=True
     )
 
     if not guild.me.guild_permissions.manage_roles:
@@ -920,6 +921,10 @@ def verify_permissions(guild):
         logger.error("Bot is missing 'manage_channels' permission")
     if not guild.me.guild_permissions.send_messages:
         logger.error("Bot is missing 'send_messages' permission")
+    if not guild.me.guild_permissions.add_reactions:
+        logger.error("Bot is missing 'add_reactions' permission")
+    if not guild.me.guild_permissions.manage_messages:
+        logger.error("Bot is missing 'manage_messages' permission")
 
     return guild.me.guild_permissions.is_superset(required_permissions)
 
